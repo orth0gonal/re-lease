@@ -8,12 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Core Concept
 - **KRW Stablecoin Integration**: Uses KRW-C (Korean Won stablecoin) as the primary payment method for Jeonse deposits, eliminating volatility risks through smart contract automation
-- **Tokenization Structure**: Converts deposited KRW-C into Principal Tokens (PT) and Yield Tokens (YT) to provide landlords with liquidity and yield opportunities  
+- **Tokenization Structure**: Converts deposited KRW-C into yield-bearing cKRW (compounded KRW) through ERC-4626 Vault to provide landlords with automatic yield generation and liquidity options  
 - **Automated Debt Recovery**: When landlords fail to return deposits, the system automatically creates creditor-debtor relationships with assignees who ensure tenant protection while earning interest income
 
 ### Key Stakeholders
 - **Tenant (임차인)**: Renter who deposits KRW-C as Jeonse security deposit
-- **Landlord (임대인)**: Property owner who receives PT/YT tokens and can trade them for liquidity
+- **Landlord (임대인)**: Property owner who receives cKRW tokens and can either hold them for automatic yield or redeem them for liquidity
 - **Assignee (채권양수인)**: Investor who purchases defaulted deposits as debt assets, earning interest while protecting tenants
 - **Verifier (검증자)**: Authorized entity that validates property authenticity and contract legitimacy
 
@@ -26,19 +26,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. **Contract Verification**: Verifier approves the rental contract terms
 
 #### 2. Deposit & Tokenization  
-1. **Deposit Submission**: Tenant deposits KRW-C into DepositPool smart contract
-2. **Token Generation**: System mints Principal Token (PT) and Yield Token (YT) for landlord
-   - **PT**: Represents deposit principal (e.g., 200M KRW-C)
-   - **YT**: Represents yield rights from deposit fund management (e.g., 3% annual)
-3. **Fund Management**: DepositPool invests KRW-C in safe assets (government bonds, AAA-grade bonds)
+1. **Deposit Submission**: Tenant deposits KRW-C into ERC-4626 Vault smart contract
+2. **cKRW Generation**: System converts KRW-C to yield-bearing cKRW (compounded KRW) for landlord
+   - **cKRW**: Represents deposit with automatic yield accrual through vault strategy
+   - **Yield Mechanism**: Vault invests underlying KRW-C in safe assets, continuously compounding returns
+3. **Fund Management**: ERC-4626 Vault invests KRW-C in safe assets (government bonds, AAA-grade bonds)
 4. **Landlord Options**:
-   - Sell PT for immediate liquidity
-   - Hold PT + sell YT for partial liquidity
-   - Hold both PT + YT for maximum long-term returns
+   - Redeem cKRW directly through contract for immediate liquidity
+   - Hold cKRW to automatically earn yield from vault strategy
+   - Transfer cKRW to other parties while maintaining yield-bearing properties
 
 #### 3. Contract Maturity
-- **Normal Return**: Landlord returns PT to contract → KRW-C returned to tenant → contract closed
-- **Default Scenario**: If landlord cannot return PT → automatic debt-credit relationship activation
+- **Normal Return**: Landlord burns cKRW through contract → equivalent KRW-C returned to tenant → contract closed
+- **Default Scenario**: If landlord cannot return cKRW → automatic debt-credit relationship activation
 
 #### 4. Debt Recovery Process
 1. **Assignee Intervention**: Assignee purchases the defaulted deposit claim
