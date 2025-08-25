@@ -23,8 +23,8 @@ interface IPropertyNFTEvents {
         DistributionChoice distributionChoice,
         uint256 depositAmount,
         uint256 ltv,
-        string registrationAddress,
-        string propertyDescription
+        bytes32 registrationAddress,
+        bytes32 propertyDescription
     );
 
     /**
@@ -57,7 +57,7 @@ interface IPropertyNFTEvents {
         DistributionChoice distributionChoice,
         uint256 depositAmount,
         uint256 ltv,
-        string registrationAddress
+        bytes32 registrationAddress
     );
 
     /**

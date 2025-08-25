@@ -13,7 +13,6 @@ import "./interfaces/Structs.sol";
 /**
  * @title SettlementManager
  * @dev Manages rental contract settlements with automated monitoring and grace period handling
- * Gas optimization target: <120,000 gas for settlement processing
  */
 contract SettlementManager is AccessControl, Pausable, ReentrancyGuard, ISettlementManagerEvents {
     
@@ -234,6 +233,30 @@ contract SettlementManager is AccessControl, Pausable, ReentrancyGuard, ISettlem
         contractStatus.notes = reason;
 
         emit GracePeriodExtended(propertyTokenId, contractStatus.settlementDeadline, reason);
+    }
+
+    /**
+     * @dev Manually escalate contract to P2P marketplace
+     * @param propertyTokenId Property NFT token ID
+     * @param claimAmount Debt claim amount
+     * @param interestRate Annual interest rate in basis points
+     */
+    function escalateToMarketplace(
+        uint256 propertyTokenId,
+        uint256 claimAmount,
+        uint256 interestRate
+    ) external onlyRole(SETTLEMENT_MANAGER_ROLE) {
+        ContractStatus storage contractStatus = contractStatuses[propertyTokenId];
+        require(
+            contractStatus.status == SettlementStatus.OVERDUE || 
+            contractStatus.status == SettlementStatus.GRACE_PERIOD,
+            "SettlementManager: Invalid status for escalation"
+        );
+
+        // Update internal escalation logic
+        _escalateToMarketplace(propertyTokenId);
+
+        emit ContractDefaulted(propertyTokenId, contractStatus.tenant, block.timestamp, false);
     }
 
     /**
