@@ -13,7 +13,6 @@ import "./interfaces/Structs.sol";
 /**
  * @title DepositPool
  * @dev ERC-4626 Vault for rental deposits with KRW→cKRW conversion and landlord distribution choices
- * Gas optimization target: <200,000 gas for deposit submission
  */
 contract DepositPool is ERC4626, AccessControl, Pausable, ReentrancyGuard, IDepositPoolEvents {
     using SafeERC20 for IERC20;

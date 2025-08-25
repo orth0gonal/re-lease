@@ -12,7 +12,6 @@ import "./interfaces/Structs.sol";
 /**
  * @title PropertyNFT
  * @dev NFT contract for Re-Lease rental property tokenization with enhanced status tracking
- * Gas optimization target: <150,000 gas for minting
  */
 contract PropertyNFT is ERC721Enumerable, AccessControl, Pausable, ReentrancyGuard, IPropertyNFTEvents {
     // Role definitions
@@ -62,12 +61,12 @@ contract PropertyNFT is ERC721Enumerable, AccessControl, Pausable, ReentrancyGua
         bool landOwnershipAuthority,
         bool landTrustAuthority,
         uint256 ltv,
-        string calldata registrationAddress,
-        string calldata propertyDescription
+        bytes32 registrationAddress,
+        bytes32 propertyDescription
     ) external whenNotPaused nonReentrant returns (uint256) {
         require(depositAmount > 0, "PropertyNFT: Deposit amount must be positive");
-        require(bytes(registrationAddress).length > 0, "PropertyNFT: Registration address cannot be empty");
-        require(bytes(propertyDescription).length > 0, "PropertyNFT: Property description cannot be empty");
+        require(registrationAddress.length > 0, "PropertyNFT: Registration address cannot be empty");
+        require(propertyDescription.length > 0, "PropertyNFT: Property description cannot be empty");
         require(ltv <= 10000, "PropertyNFT: LTV cannot exceed 100% (10000 basis points)");
 
         uint256 proposalId = _proposalIdCounter++;
@@ -180,11 +179,11 @@ contract PropertyNFT is ERC721Enumerable, AccessControl, Pausable, ReentrancyGua
         bool landOwnershipAuthority,
         bool landTrustAuthority,
         uint256 ltv,
-        string calldata registrationAddress
+        bytes32 registrationAddress
     ) internal returns (uint256) {
         require(landlord != address(0), "PropertyNFT: Invalid landlord address");
         require(depositAmount > 0, "PropertyNFT: Deposit amount must be positive");
-        require(bytes(registrationAddress).length > 0, "PropertyNFT: Registration address cannot be empty");
+        require(registrationAddress.length > 0, "PropertyNFT: Registration address cannot be empty");
         require(ltv <= 10000, "PropertyNFT: LTV cannot exceed 100% (10000 basis points)");
 
         uint256 tokenId = _tokenIdCounter++;
@@ -461,7 +460,7 @@ contract PropertyNFT is ERC721Enumerable, AccessControl, Pausable, ReentrancyGua
         require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
         require(bytes(newAddress).length > 0, "PropertyNFT: Registration address cannot be empty");
         
-        properties[tokenId].registrationAddress = newAddress;
+        properties[tokenId].registrationAddress = keccak256(bytes(newAddress));
     }
 
     /**
