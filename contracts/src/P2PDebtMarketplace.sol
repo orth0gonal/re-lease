@@ -8,13 +8,15 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./PropertyNFT.sol";
 import "./DepositPool.sol";
+import "./interfaces/Events.sol";
+import "./interfaces/Structs.sol";
 
 /**
  * @title P2PDebtMarketplace
  * @dev Peer-to-peer marketplace for trading rental deposit debt claims
  * Gas optimization target: <180,000 gas for debt purchase
  */
-contract P2PDebtMarketplace is AccessControl, Pausable, ReentrancyGuard {
+contract P2PDebtMarketplace is AccessControl, Pausable, ReentrancyGuard, IP2PDebtMarketplaceEvents {
     using SafeERC20 for IERC20;
 
     // Role definitions
@@ -22,47 +24,6 @@ contract P2PDebtMarketplace is AccessControl, Pausable, ReentrancyGuard {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant FEE_MANAGER_ROLE = keccak256("FEE_MANAGER_ROLE");
 
-    // Debt claim status enumeration
-    enum ClaimStatus {
-        LISTED,       // Debt claim listed for sale
-        SOLD,         // Debt claim sold to investor
-        REPAID,       // Debt repaid by tenant
-        LIQUIDATED,   // Debt liquidated due to extended default
-        CANCELLED     // Debt claim cancelled
-    }
-
-    // Debt claim structure - optimized to avoid stack too deep
-    struct DebtClaim {
-        uint256 claimId;                // Unique claim identifier
-        uint256 propertyTokenId;        // Associated property NFT token ID
-        address originalCreditor;       // Original landlord/creditor
-        address currentOwner;           // Current debt claim owner
-        address debtor;                 // Tenant/debtor
-        uint256 principalAmount;        // Original debt amount
-        uint256 currentAmount;          // Current debt amount (principal + interest)
-        uint256 creationTime;           // Debt claim creation timestamp
-        uint256 repaymentDeadline;      // Final repayment deadline
-        ClaimStatus status;             // Current claim status
-    }
-
-    // Additional claim data structure
-    struct ClaimMetadata {
-        uint256 interestRate;           // Annual interest rate (scaled by 1e18)
-        uint256 listingPrice;           // Price at which debt is listed
-        uint256 lastInterestUpdate;     // Last interest calculation timestamp
-        uint256 totalInterestAccrued;   // Total interest accrued to date
-        bool isSecondaryMarket;         // Whether it's a secondary market listing
-    }
-
-    // Marketplace configuration
-    struct MarketplaceConfig {
-        uint256 platformFeeRate;        // Platform fee rate (scaled by 1e18)
-        uint256 defaultInterestRate;    // Default interest rate for new claims
-        uint256 maxInterestRate;        // Maximum allowed interest rate
-        uint256 liquidationPeriod;      // Period after which claims can be liquidated
-        uint256 minListingPrice;        // Minimum listing price
-        bool secondaryTradingEnabled;   // Whether secondary trading is allowed
-    }
 
     // State variables
     PropertyNFT public immutable propertyNFT;
@@ -87,49 +48,6 @@ contract P2PDebtMarketplace is AccessControl, Pausable, ReentrancyGuard {
     uint256 public constant SECONDS_PER_YEAR = 365 days;
     uint256 public constant MAX_INTEREST_RATE = 50e18; // 50% max interest rate
 
-    // Events
-    event DebtClaimListed(
-        uint256 indexed claimId,
-        uint256 indexed propertyTokenId,
-        address indexed creditor,
-        address debtor,
-        uint256 principalAmount,
-        uint256 listingPrice,
-        uint256 interestRate
-    );
-
-    event DebtClaimPurchased(
-        uint256 indexed claimId,
-        address indexed buyer,
-        address indexed seller,
-        uint256 purchasePrice,
-        uint256 platformFee
-    );
-
-    event DebtRepaid(
-        uint256 indexed claimId,
-        address indexed debtor,
-        uint256 repaidAmount,
-        uint256 interestPaid
-    );
-
-    event DebtLiquidated(
-        uint256 indexed claimId,
-        address indexed liquidator,
-        uint256 recoveredAmount
-    );
-
-    event InterestAccrued(
-        uint256 indexed claimId,
-        uint256 interestAmount,
-        uint256 newTotalAmount
-    );
-
-    event ConfigUpdated(
-        uint256 newPlatformFeeRate,
-        uint256 newDefaultInterestRate,
-        uint256 newLiquidationPeriod
-    );
 
     /**
      * @dev Constructor initializes the marketplace with required dependencies
@@ -171,20 +89,18 @@ contract P2PDebtMarketplace is AccessControl, Pausable, ReentrancyGuard {
     /**
      * @dev List a debt claim for sale (called when deposit defaults)
      * @param propertyTokenId Property NFT token ID
-     * @param debtor Tenant/debtor address
      * @param principalAmount Original debt amount
      * @param listingPrice Price at which to list the debt
      * @param interestRate Custom interest rate (0 for default rate)
      * @return claimId The newly created claim ID
+     * @notice The landlord automatically becomes the debtor as they failed to return the deposit
      */
     function listDebtClaim(
         uint256 propertyTokenId,
-        address debtor,
         uint256 principalAmount,
         uint256 listingPrice,
         uint256 interestRate
     ) external onlyRole(MARKETPLACE_ADMIN_ROLE) whenNotPaused returns (uint256) {
-        require(debtor != address(0), "P2PMarketplace: Invalid debtor address");
         require(principalAmount > 0, "P2PMarketplace: Invalid principal amount");
         require(listingPrice >= config.minListingPrice, "P2PMarketplace: Listing price too low");
         require(propertyToClaim[propertyTokenId] == 0, "P2PMarketplace: Claim already exists");
@@ -194,18 +110,18 @@ contract P2PDebtMarketplace is AccessControl, Pausable, ReentrancyGuard {
         require(finalInterestRate <= config.maxInterestRate, "P2PMarketplace: Interest rate too high");
 
         // Get property information
-        PropertyNFT.Property memory property = propertyNFT.getProperty(propertyTokenId);
-        require(property.status == PropertyNFT.PropertyStatus.OVERDUE, "P2PMarketplace: Property not overdue");
+        Property memory property = propertyNFT.getProperty(propertyTokenId);
+        require(property.status == PropertyStatus.OVERDUE, "P2PMarketplace: Property not overdue");
 
         uint256 claimId = _claimIdCounter++;
 
-        // Create debt claim
+        // Create debt claim - landlord is the debtor who failed to return deposit
         debtClaims[claimId] = DebtClaim({
             claimId: claimId,
             propertyTokenId: propertyTokenId,
             originalCreditor: property.landlord,
             currentOwner: property.landlord,
-            debtor: debtor,
+            debtor: property.landlord, // Landlord is the debtor who failed to return deposit
             principalAmount: principalAmount,
             currentAmount: principalAmount,
             creationTime: block.timestamp,
@@ -225,14 +141,14 @@ contract P2PDebtMarketplace is AccessControl, Pausable, ReentrancyGuard {
         // Update mappings
         propertyToClaim[propertyTokenId] = claimId;
         creditorClaims[property.landlord].push(claimId);
-        debtorClaims[debtor].push(claimId);
+        debtorClaims[property.landlord].push(claimId); // Landlord is the debtor
         totalActiveClaims++;
 
         emit DebtClaimListed(
             claimId,
             propertyTokenId,
             property.landlord,
-            debtor,
+            property.landlord, // Landlord is the debtor who failed to return deposit
             principalAmount,
             listingPrice,
             finalInterestRate
@@ -280,8 +196,9 @@ contract P2PDebtMarketplace is AccessControl, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev Repay debt to settle the claim
+     * @dev Repay debt to settle the claim (called by landlord as debtor)
      * @param claimId Debt claim ID to repay
+     * @notice Only the landlord (debtor) can call this function to repay the debt
      */
     function repayDebt(uint256 claimId) external nonReentrant whenNotPaused {
         DebtClaim storage claim = debtClaims[claimId];
