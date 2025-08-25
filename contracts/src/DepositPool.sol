@@ -7,44 +7,21 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./PropertyNFT.sol";
+import "./interfaces/Events.sol";
+import "./interfaces/Structs.sol";
 
 /**
  * @title DepositPool
  * @dev ERC-4626 Vault for rental deposits with KRW→cKRW conversion and landlord distribution choices
  * Gas optimization target: <200,000 gas for deposit submission
  */
-contract DepositPool is ERC4626, AccessControl, Pausable, ReentrancyGuard {
+contract DepositPool is ERC4626, AccessControl, Pausable, ReentrancyGuard, IDepositPoolEvents {
     using SafeERC20 for IERC20;
     // Role definitions
     bytes32 public constant POOL_MANAGER_ROLE = keccak256("POOL_MANAGER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant YIELD_MANAGER_ROLE = keccak256("YIELD_MANAGER_ROLE");
 
-    // Deposit status enumeration
-    enum DepositStatus {
-        PENDING,      // Deposit submitted, waiting for confirmation
-        ACTIVE,       // Deposit confirmed and active
-        SETTLEMENT,   // In settlement process
-        COMPLETED,    // Settlement completed successfully
-        DEFAULTED,    // Default occurred, moved to P2P marketplace
-        RECOVERED     // Tenant recovered deposit
-    }
-
-    // Deposit information structure
-    struct DepositInfo {
-        uint256 propertyTokenId;         // Associated property NFT token ID
-        address tenant;                  // Tenant who submitted deposit
-        address landlord;                // Property landlord
-        uint256 krwAmount;              // Original KRW deposit amount
-        uint256 cKRWShares;             // cKRW vault shares for this deposit
-        uint256 yieldEarned;            // Additional yield earned
-        DepositStatus status;           // Current deposit status
-        PropertyNFT.DistributionChoice distributionChoice; // Landlord's choice
-        uint256 submissionTime;         // Deposit submission timestamp
-        uint256 expectedReturnTime;     // Expected contract end time
-        bool isInPool;                  // Whether deposit is retained in pool for yield
-        uint256 lastYieldCalculation;   // Last yield calculation timestamp
-    }
 
     // State variables
     PropertyNFT public immutable propertyNFT;
@@ -60,58 +37,6 @@ contract DepositPool is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     uint256 public constant MAX_DEPOSIT_AMOUNT = 10000000 * 1e18; // 10M KRW maximum
     uint256 public constant YIELD_CALCULATION_INTERVAL = 1 days;
 
-    // Events
-    event DepositSubmitted(
-        uint256 indexed propertyTokenId,
-        address indexed tenant,
-        address indexed landlord,
-        uint256 krwAmount,
-        uint256 cKRWShares,
-        PropertyNFT.DistributionChoice distributionChoice
-    );
-
-    event DepositActivated(
-        uint256 indexed propertyTokenId,
-        address indexed tenant,
-        uint256 expectedReturnTime
-    );
-
-    event DepositDistributed(
-        uint256 indexed propertyTokenId,
-        address indexed landlord,
-        uint256 krwAmount,
-        PropertyNFT.DistributionChoice distributionChoice
-    );
-
-    event DepositRetainedInPool(
-        uint256 indexed propertyTokenId,
-        uint256 cKRWShares,
-        uint256 expectedYield
-    );
-
-    event YieldCalculated(
-        uint256 indexed propertyTokenId,
-        uint256 yieldAmount,
-        uint256 totalAccumulated
-    );
-
-    event DepositRecovered(
-        uint256 indexed propertyTokenId,
-        address indexed tenant,
-        uint256 krwAmount,
-        uint256 yieldAmount
-    );
-
-    event YieldRateUpdated(
-        uint256 oldRate,
-        uint256 newRate
-    );
-
-    event DepositDefaultHandled(
-        uint256 indexed propertyTokenId,
-        address indexed tenant,
-        uint256 krwAmount
-    );
 
     /**
      * @dev Constructor initializes the ERC-4626 vault
@@ -150,15 +75,15 @@ contract DepositPool is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         require(krwAmount <= MAX_DEPOSIT_AMOUNT, "DepositPool: Deposit amount too high");
         
         // Get property information
-        PropertyNFT.Property memory property = propertyNFT.getProperty(propertyTokenId);
-        require(property.status == PropertyNFT.PropertyStatus.CONTRACT_VERIFIED, "DepositPool: Contract not verified");
+        Property memory property = propertyNFT.getProperty(propertyTokenId);
+        require(property.status == PropertyStatus.CONTRACT_VERIFIED, "DepositPool: Contract not verified");
         require(property.proposedTenant == msg.sender, "DepositPool: Only proposed tenant can submit deposit");
         require(property.proposedDepositAmount == krwAmount, "DepositPool: Incorrect deposit amount");
         require(deposits[propertyTokenId].tenant == address(0), "DepositPool: Deposit already exists");
 
         // Handle distribution choice
         uint256 cKRWShares = 0;
-        bool retainInPool = (property.distributionChoice == PropertyNFT.DistributionChoice.POOL);
+        bool retainInPool = (property.distributionChoice == DistributionChoice.POOL);
 
         if (retainInPool) {
             // POOL choice: Convert KRW to cKRW vault shares for yield generation
@@ -254,7 +179,7 @@ contract DepositPool is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     }
 
     /**
-     * @dev Recover deposit after settlement
+     * @dev Recover deposit after settlement - tenant gets principal only, yield goes to landlord
      * @param propertyTokenId The property token ID
      */
     function recoverDeposit(uint256 propertyTokenId) external nonReentrant {
@@ -262,26 +187,60 @@ contract DepositPool is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         require(depositInfo.tenant == msg.sender, "DepositPool: Only tenant can recover deposit");
         require(depositInfo.status == DepositStatus.COMPLETED, "DepositPool: Settlement not completed");
 
-        uint256 totalRecoveryAmount = depositInfo.krwAmount;
-        uint256 yieldAmount = 0;
+        uint256 tenantRecoveryAmount = depositInfo.krwAmount; // Principal only
+        uint256 yieldForLandlord = 0;
 
         if (depositInfo.isInPool) {
-            // Calculate final yield
-            yieldAmount = calculateYield(propertyTokenId);
+            // Calculate final yield for landlord
+            yieldForLandlord = calculateYield(propertyTokenId);
             
             // Redeem cKRW shares from vault
             uint256 assetsReceived = redeem(depositInfo.cKRWShares, address(this), address(this));
-            totalRecoveryAmount = assetsReceived + depositInfo.yieldEarned;
+            
+            // Total yield includes vault appreciation + additional yield
+            yieldForLandlord = depositInfo.yieldEarned;
+            if (assetsReceived > depositInfo.krwAmount) {
+                yieldForLandlord += (assetsReceived - depositInfo.krwAmount);
+            }
+
+            // Transfer yield to landlord
+            if (yieldForLandlord > 0) {
+                IERC20(asset()).safeTransfer(depositInfo.landlord, yieldForLandlord);
+            }
         }
 
-        // Transfer recovery amount to tenant
-        IERC20(asset()).safeTransfer(msg.sender, totalRecoveryAmount);
+        // Transfer principal only to tenant
+        IERC20(asset()).safeTransfer(msg.sender, tenantRecoveryAmount);
 
         // Update status
         depositInfo.status = DepositStatus.RECOVERED;
         totalActiveDeposits--;
 
-        emit DepositRecovered(propertyTokenId, msg.sender, totalRecoveryAmount, depositInfo.yieldEarned);
+        emit DepositRecovered(propertyTokenId, msg.sender, tenantRecoveryAmount, yieldForLandlord);
+    }
+
+    /**
+     * @dev Landlord withdraws yield from active pool deposits
+     * @param propertyTokenId The property token ID
+     * @return yieldAmount Amount of yield withdrawn
+     */
+    function withdrawYield(uint256 propertyTokenId) external nonReentrant returns (uint256 yieldAmount) {
+        DepositInfo storage depositInfo = deposits[propertyTokenId];
+        require(depositInfo.landlord == msg.sender, "DepositPool: Only landlord can withdraw yield");
+        require(depositInfo.isInPool, "DepositPool: Deposit not in yield pool");
+        require(depositInfo.status == DepositStatus.ACTIVE, "DepositPool: Deposit not active");
+
+        // Calculate available yield
+        yieldAmount = calculateYield(propertyTokenId);
+        require(yieldAmount > 0, "DepositPool: No yield available");
+
+        // Transfer yield to landlord
+        IERC20(asset()).safeTransfer(msg.sender, yieldAmount);
+
+        // Reset yield earned as it's been withdrawn
+        depositInfo.yieldEarned = 0;
+
+        return yieldAmount;
     }
 
     /**
