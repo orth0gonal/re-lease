@@ -1,130 +1,38 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "./interfaces/Events.sol";
+import "./interfaces/Structs.sol";
 
 /**
  * @title PropertyNFT
  * @dev NFT contract for Re-Lease rental property tokenization with enhanced status tracking
  * Gas optimization target: <150,000 gas for minting
  */
-contract PropertyNFT is ERC721, AccessControl, Pausable, ReentrancyGuard {
+contract PropertyNFT is ERC721Enumerable, AccessControl, Pausable, ReentrancyGuard, IPropertyNFTEvents {
     // Role definitions
     bytes32 public constant PROPERTY_VERIFIER_ROLE = keccak256("PROPERTY_VERIFIER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    // Property status enumeration
-    enum PropertyStatus {
-        PENDING,           // Property listed but not verified
-        ACTIVE,            // Property verified and available for rental
-        CONTRACT_PENDING,  // Rental contract created by landlord, awaiting verification
-        CONTRACT_VERIFIED, // Contract verified by admin, awaiting tenant deposit
-        RENTED,            // Property currently rented with deposit
-        SETTLEMENT,        // In settlement period
-        OVERDUE,           // Settlement overdue, needs P2P marketplace
-        COMPLETED,         // Settlement completed successfully
-        DISPUTED,          // In dispute resolution
-        SUSPENDED          // Property suspended/delisted
-    }
-
-    // Landlord distribution choice for deposits
-    enum DistributionChoice {
-        DIRECT,       // Direct KRW distribution to landlord
-        POOL          // Hold in cKRW pool for yield optimization
-    }
-
-    // Property information structure
-    struct Property {
-        address landlord;                    // Property owner address
-        PropertyStatus status;               // Current property status
-        DistributionChoice distributionChoice; // Landlord's preferred distribution method
-        uint256 depositAmount;              // Required deposit amount in KRW
-        uint256 monthlyRent;                // Monthly rent amount in KRW
-        uint256 contractStartTime;          // Rental contract start timestamp
-        uint256 contractEndTime;            // Rental contract end timestamp
-        uint256 settlementDeadline;         // Settlement deadline timestamp
-        address currentTenant;              // Current tenant address
-        address proposedTenant;             // Proposed tenant during contract creation
-        uint256 proposedDepositAmount;      // Proposed deposit amount during contract creation
-        bool isVerified;                    // Property verification status
-        uint256 createdAt;                  // Property creation timestamp
-        // New fields added
-        bool landOwnershipAuthority;        // 땅의 소유권한
-        bool landTrustAuthority;            // 땅의 신탁권한  
-        uint256 ltv;                        // LTV (Loan-to-Value ratio)
-        string registrationAddress;         // 등기 주소
-    }
 
     // State variables
     mapping(uint256 => Property) public properties;
+    mapping(uint256 => PropertyProposal) public propertyProposals;
     mapping(address => uint256[]) public landlordProperties;
+    mapping(address => uint256[]) public landlordProposals;
     mapping(address => uint256) public tenantActiveProperty;
     
     uint256 private _tokenIdCounter;
+    uint256 private _proposalIdCounter;
     uint256 public constant SETTLEMENT_GRACE_PERIOD = 30 days;
     uint256 public constant VERIFICATION_TIMEOUT = 7 days;
+    uint256 public constant PROPOSAL_VERIFICATION_PERIOD = 14 days;
 
-    // Events
-    event PropertyMinted(
-        uint256 indexed tokenId,
-        address indexed landlord,
-        DistributionChoice distributionChoice,
-        uint256 depositAmount,
-        uint256 monthlyRent,
-        uint256 ltv,
-        string registrationAddress
-    );
-
-    event PropertyStatusUpdated(
-        uint256 indexed tokenId,
-        PropertyStatus oldStatus,
-        PropertyStatus newStatus
-    );
-
-    event PropertyRented(
-        uint256 indexed tokenId,
-        address indexed tenant,
-        uint256 contractStartTime,
-        uint256 contractEndTime
-    );
-
-    event SettlementInitiated(
-        uint256 indexed tokenId,
-        uint256 settlementDeadline
-    );
-
-    event PropertyOverdue(
-        uint256 indexed tokenId,
-        uint256 overdueTimestamp
-    );
-
-    event DistributionChoiceUpdated(
-        uint256 indexed tokenId,
-        DistributionChoice oldChoice,
-        DistributionChoice newChoice
-    );
-
-    event RentalContractCreated(
-        uint256 indexed tokenId,
-        address indexed proposedTenant,
-        uint256 contractStartTime,
-        uint256 contractEndTime,
-        uint256 proposedDepositAmount
-    );
-
-    event RentalContractVerified(
-        uint256 indexed tokenId,
-        address indexed verifier
-    );
-
-    event RentalContractFinalized(
-        uint256 indexed tokenId,
-        address indexed tenant
-    );
 
     /**
      * @dev Constructor initializes the contract with name and symbol
@@ -134,33 +42,148 @@ contract PropertyNFT is ERC721, AccessControl, Pausable, ReentrancyGuard {
         _grantRole(PROPERTY_VERIFIER_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _tokenIdCounter = 1; // Start from 1 to avoid tokenId 0
+        _proposalIdCounter = 1; // Start from 1 to avoid proposalId 0
     }
 
     /**
-     * @dev Mint a new property NFT with landlord distribution choice and property details
+     * @dev Landlord proposes a property for listing
+     * @param distributionChoice Landlord's preferred distribution method
+     * @param depositAmount Required deposit amount in KRW
+     * @param landOwnershipAuthority Whether landlord has land ownership authority
+     * @param landTrustAuthority Whether landlord has land trust authority
+     * @param ltv Loan-to-Value ratio for the property
+     * @param registrationAddress Registration address of the property
+     * @param propertyDescription Description of the property
+     * @return proposalId The newly created proposal ID
+     */
+    function proposeProperty(
+        DistributionChoice distributionChoice,
+        uint256 depositAmount,
+        bool landOwnershipAuthority,
+        bool landTrustAuthority,
+        uint256 ltv,
+        string calldata registrationAddress,
+        string calldata propertyDescription
+    ) external whenNotPaused nonReentrant returns (uint256) {
+        require(depositAmount > 0, "PropertyNFT: Deposit amount must be positive");
+        require(bytes(registrationAddress).length > 0, "PropertyNFT: Registration address cannot be empty");
+        require(bytes(propertyDescription).length > 0, "PropertyNFT: Property description cannot be empty");
+        require(ltv <= 10000, "PropertyNFT: LTV cannot exceed 100% (10000 basis points)");
+
+        uint256 proposalId = _proposalIdCounter++;
+
+        // Create property proposal
+        propertyProposals[proposalId] = PropertyProposal({
+            landlord: msg.sender,
+            distributionChoice: distributionChoice,
+            depositAmount: depositAmount,
+            landOwnershipAuthority: landOwnershipAuthority,
+            landTrustAuthority: landTrustAuthority,
+            ltv: ltv,
+            registrationAddress: registrationAddress,
+            propertyDescription: propertyDescription,
+            proposalTime: block.timestamp,
+            verificationDeadline: block.timestamp + PROPOSAL_VERIFICATION_PERIOD,
+            isProcessed: false
+        });
+
+        // Update landlord's proposal list
+        landlordProposals[msg.sender].push(proposalId);
+
+        emit PropertyProposed(
+            proposalId,
+            msg.sender,
+            distributionChoice,
+            depositAmount,
+            ltv,
+            registrationAddress,
+            propertyDescription
+        );
+
+        return proposalId;
+    }
+
+    /**
+     * @dev Approve a property proposal and mint NFT
+     * @param proposalId The proposal ID to approve
+     * @return tokenId The newly minted token ID
+     */
+    function approvePropertyProposal(uint256 proposalId) 
+        external 
+        onlyRole(PROPERTY_VERIFIER_ROLE) 
+        whenNotPaused 
+        nonReentrant 
+        returns (uint256) 
+    {
+        PropertyProposal storage proposal = propertyProposals[proposalId];
+        require(proposal.landlord != address(0), "PropertyNFT: Proposal does not exist");
+        require(!proposal.isProcessed, "PropertyNFT: Proposal already processed");
+        require(block.timestamp <= proposal.verificationDeadline, "PropertyNFT: Proposal verification deadline passed");
+
+        // Use internal _mintProperty function to create the NFT
+        uint256 tokenId = _mintProperty(
+            proposal.landlord,
+            proposal.distributionChoice,
+            proposal.depositAmount,
+            proposal.landOwnershipAuthority,
+            proposal.landTrustAuthority,
+            proposal.ltv,
+            proposal.registrationAddress
+        );
+
+        // Set the proposal ID to link property with its original proposal
+        properties[tokenId].proposalId = proposalId;
+
+        // Mark proposal as processed
+        proposal.isProcessed = true;
+
+        emit PropertyProposalApproved(proposalId, tokenId, msg.sender);
+
+        return tokenId;
+    }
+
+    /**
+     * @dev Reject a property proposal
+     * @param proposalId The proposal ID to reject
+     * @param reason Reason for rejection
+     */
+    function rejectPropertyProposal(
+        uint256 proposalId,
+        string calldata reason
+    ) external onlyRole(PROPERTY_VERIFIER_ROLE) whenNotPaused {
+        PropertyProposal storage proposal = propertyProposals[proposalId];
+        require(proposal.landlord != address(0), "PropertyNFT: Proposal does not exist");
+        require(!proposal.isProcessed, "PropertyNFT: Proposal already processed");
+        require(bytes(reason).length > 0, "PropertyNFT: Rejection reason cannot be empty");
+
+        // Mark proposal as processed
+        proposal.isProcessed = true;
+
+        emit PropertyProposalRejected(proposalId, msg.sender, reason);
+    }
+
+    /**
+     * @dev Internal function to mint a new property NFT with landlord distribution choice and property details
      * @param landlord Address of the property owner
      * @param distributionChoice Landlord's preferred distribution method
      * @param depositAmount Required deposit amount in KRW
-     * @param monthlyRent Monthly rent amount in KRW
      * @param landOwnershipAuthority Whether landlord has land ownership authority
      * @param landTrustAuthority Whether landlord has land trust authority
      * @param ltv Loan-to-Value ratio for the property
      * @param registrationAddress Registration address of the property
      * @return tokenId The newly minted token ID
      */
-    function mintProperty(
+    function _mintProperty(
         address landlord,
         DistributionChoice distributionChoice,
         uint256 depositAmount,
-        uint256 monthlyRent,
         bool landOwnershipAuthority,
         bool landTrustAuthority,
         uint256 ltv,
         string calldata registrationAddress
-    ) external onlyRole(PROPERTY_VERIFIER_ROLE) whenNotPaused nonReentrant returns (uint256) {
+    ) internal returns (uint256) {
         require(landlord != address(0), "PropertyNFT: Invalid landlord address");
         require(depositAmount > 0, "PropertyNFT: Deposit amount must be positive");
-        require(monthlyRent > 0, "PropertyNFT: Monthly rent must be positive");
         require(bytes(registrationAddress).length > 0, "PropertyNFT: Registration address cannot be empty");
         require(ltv <= 10000, "PropertyNFT: LTV cannot exceed 100% (10000 basis points)");
 
@@ -175,7 +198,6 @@ contract PropertyNFT is ERC721, AccessControl, Pausable, ReentrancyGuard {
             status: PropertyStatus.PENDING,
             distributionChoice: distributionChoice,
             depositAmount: depositAmount,
-            monthlyRent: monthlyRent,
             contractStartTime: 0,
             contractEndTime: 0,
             settlementDeadline: 0,
@@ -184,6 +206,7 @@ contract PropertyNFT is ERC721, AccessControl, Pausable, ReentrancyGuard {
             proposedDepositAmount: 0,
             isVerified: false,
             createdAt: block.timestamp,
+            proposalId: 0, // Direct minting, not from proposal
             landOwnershipAuthority: landOwnershipAuthority,
             landTrustAuthority: landTrustAuthority,
             ltv: ltv,
@@ -193,7 +216,7 @@ contract PropertyNFT is ERC721, AccessControl, Pausable, ReentrancyGuard {
         // Update landlord's property list
         landlordProperties[landlord].push(tokenId);
 
-        emit PropertyMinted(tokenId, landlord, distributionChoice, depositAmount, monthlyRent, ltv, registrationAddress);
+        emit PropertyMinted(tokenId, landlord, distributionChoice, depositAmount, ltv, registrationAddress);
 
         return tokenId;
     }
@@ -505,6 +528,74 @@ contract PropertyNFT is ERC721, AccessControl, Pausable, ReentrancyGuard {
     }
 
     /**
+     * @dev Get current proposal ID counter
+     * @return Current proposal ID counter value
+     */
+    function getCurrentProposalId() external view returns (uint256) {
+        return _proposalIdCounter;
+    }
+
+    /**
+     * @dev Get property proposal information
+     * @param proposalId The proposal ID
+     * @return PropertyProposal struct containing all proposal data
+     */
+    function getPropertyProposal(uint256 proposalId) external view returns (PropertyProposal memory) {
+        PropertyProposal memory proposal = propertyProposals[proposalId];
+        require(proposal.landlord != address(0), "PropertyNFT: Proposal does not exist");
+        return proposal;
+    }
+
+    /**
+     * @dev Get proposals by a landlord
+     * @param landlord The landlord address
+     * @return Array of proposal IDs by the landlord
+     */
+    function getLandlordProposals(address landlord) external view returns (uint256[] memory) {
+        return landlordProposals[landlord];
+    }
+
+    /**
+     * @dev Get pending proposals (not processed and within deadline)
+     * @return Array of pending proposal IDs
+     */
+    function getPendingProposals() external view returns (uint256[] memory) {
+        uint256 totalProposals = _proposalIdCounter - 1;
+        uint256[] memory tempPending = new uint256[](totalProposals);
+        uint256 pendingCount = 0;
+
+        for (uint256 i = 1; i <= totalProposals; i++) {
+            PropertyProposal memory proposal = propertyProposals[i];
+            if (!proposal.isProcessed && 
+                proposal.landlord != address(0) &&
+                block.timestamp <= proposal.verificationDeadline) {
+                tempPending[pendingCount] = i;
+                pendingCount++;
+            }
+        }
+
+        // Create final array with exact size
+        uint256[] memory pendingProposals = new uint256[](pendingCount);
+        for (uint256 i = 0; i < pendingCount; i++) {
+            pendingProposals[i] = tempPending[i];
+        }
+
+        return pendingProposals;
+    }
+
+    /**
+     * @dev Check if a proposal is expired
+     * @param proposalId The proposal ID to check
+     * @return True if proposal is expired
+     */
+    function isProposalExpired(uint256 proposalId) external view returns (bool) {
+        PropertyProposal memory proposal = propertyProposals[proposalId];
+        require(proposal.landlord != address(0), "PropertyNFT: Proposal does not exist");
+        
+        return !proposal.isProcessed && block.timestamp > proposal.verificationDeadline;
+    }
+
+    /**
      * @dev Override tokenURI to return property-specific metadata
      * @param tokenId The property token ID
      * @return The URI for the token metadata
@@ -538,18 +629,18 @@ contract PropertyNFT is ERC721, AccessControl, Pausable, ReentrancyGuard {
     /**
      * @dev See {IERC165-supportsInterface}
      */
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721, AccessControl) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Enumerable, AccessControl) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 
     /**
-     * @dev Override _update to add pause functionality
+     * @dev Override _update to add pause functionality and ERC721Enumerable support
      */
     function _update(
         address to,
         uint256 tokenId,
         address auth
-    ) internal override whenNotPaused returns (address) {
+    ) internal override(ERC721Enumerable) whenNotPaused returns (address) {
         return super._update(to, tokenId, auth);
     }
 }

@@ -5,13 +5,14 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "./interfaces/Events.sol";
 
 /**
  * @title KRWToken
  * @dev ERC20 token representing Korean Won (KRW) stablecoin for Re-Lease system
  * Only deployer (minter) can mint new tokens
  */
-contract KRWToken is ERC20, AccessControl, Pausable, ERC20Burnable {
+contract KRWToken is ERC20, AccessControl, Pausable, ERC20Burnable, IKRWTokenEvents {
     
     // Role definitions
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -21,9 +22,6 @@ contract KRWToken is ERC20, AccessControl, Pausable, ERC20Burnable {
     uint8 private constant DECIMALS = 18;
     uint256 public constant MAX_SUPPLY = 1_000_000_000 * 10**DECIMALS; // 1 billion KRW max supply
 
-    // Events
-    event TokensMinted(address indexed to, uint256 amount);
-    event TokensBurned(address indexed from, uint256 amount);
 
     /**
      * @dev Constructor initializes the KRW token

@@ -7,52 +7,21 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./PropertyNFT.sol";
 import "./DepositPool.sol";
 import "./P2PDebtMarketplace.sol";
+import "./interfaces/Events.sol";
+import "./interfaces/Structs.sol";
 
 /**
  * @title SettlementManager
  * @dev Manages rental contract settlements with automated monitoring and grace period handling
  * Gas optimization target: <120,000 gas for settlement processing
  */
-contract SettlementManager is AccessControl, Pausable, ReentrancyGuard {
+contract SettlementManager is AccessControl, Pausable, ReentrancyGuard, ISettlementManagerEvents {
     
     // Role definitions
     bytes32 public constant SETTLEMENT_MANAGER_ROLE = keccak256("SETTLEMENT_MANAGER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MONITOR_ROLE = keccak256("MONITOR_ROLE");
 
-    // Settlement status enumeration
-    enum SettlementStatus {
-        ACTIVE,           // Contract is active, no settlement needed
-        PENDING,          // Settlement period started
-        GRACE_PERIOD,     // In grace period, warning issued
-        OVERDUE,          // Grace period expired, escalation needed
-        SETTLED,          // Successfully settled
-        DEFAULTED         // Settlement failed, moved to marketplace
-    }
-
-    // Contract monitoring structure
-    struct ContractStatus {
-        uint256 propertyTokenId;        // Associated property NFT token ID
-        address tenant;                 // Tenant address
-        address landlord;               // Landlord address
-        uint256 contractEndTime;        // Original contract end timestamp
-        uint256 settlementDeadline;     // Settlement deadline (end + grace period)
-        uint256 gracePeriodStart;       // Grace period start timestamp
-        uint256 warningsSent;           // Number of warnings sent
-        uint256 lastStatusUpdate;       // Last status update timestamp
-        SettlementStatus status;        // Current settlement status
-        bool autoProcessingEnabled;    // Whether automatic processing is enabled
-        string notes;                   // Additional notes for the settlement
-    }
-
-    // Warning configuration
-    struct WarningConfig {
-        uint256 firstWarningDays;       // Days before deadline for first warning
-        uint256 secondWarningDays;      // Days before deadline for second warning
-        uint256 finalWarningDays;       // Days before deadline for final warning
-        uint256 gracePeriodDays;        // Grace period duration in days
-        bool autoEscalationEnabled;    // Whether to auto-escalate to marketplace
-    }
 
     // State variables
     PropertyNFT public immutable propertyNFT;
@@ -75,54 +44,6 @@ contract SettlementManager is AccessControl, Pausable, ReentrancyGuard {
     uint256 public constant MAX_GRACE_PERIOD = 90 days;
     uint256 public constant WARNING_THRESHOLD = 30; // Max warnings per contract
 
-    // Events
-    event ContractRegistered(
-        uint256 indexed propertyTokenId,
-        address indexed tenant,
-        address indexed landlord,
-        uint256 contractEndTime,
-        uint256 settlementDeadline
-    );
-
-    event SettlementStatusUpdated(
-        uint256 indexed propertyTokenId,
-        SettlementStatus oldStatus,
-        SettlementStatus newStatus,
-        uint256 timestamp
-    );
-
-    event WarningIssued(
-        uint256 indexed propertyTokenId,
-        address indexed tenant,
-        uint256 warningNumber,
-        uint256 daysRemaining,
-        uint256 timestamp
-    );
-
-    event SettlementCompleted(
-        uint256 indexed propertyTokenId,
-        address indexed tenant,
-        uint256 completionTime
-    );
-
-    event ContractDefaulted(
-        uint256 indexed propertyTokenId,
-        address indexed tenant,
-        uint256 defaultTime,
-        bool escalatedToMarketplace
-    );
-
-    event BatchProcessingCompleted(
-        uint256 contractsProcessed,
-        uint256 warningsIssued,
-        uint256 escalations
-    );
-
-    event GracePeriodExtended(
-        uint256 indexed propertyTokenId,
-        uint256 newDeadline,
-        string reason
-    );
 
     /**
      * @dev Constructor initializes the manager with required dependencies
@@ -176,8 +97,8 @@ contract SettlementManager is AccessControl, Pausable, ReentrancyGuard {
         require(!registeredContracts[propertyTokenId], "SettlementManager: Contract already registered");
 
         // Get property information
-        PropertyNFT.Property memory property = propertyNFT.getProperty(propertyTokenId);
-        require(property.status == PropertyNFT.PropertyStatus.RENTED, "SettlementManager: Property not rented");
+        Property memory property = propertyNFT.getProperty(propertyTokenId);
+        require(property.status == PropertyStatus.RENTED, "SettlementManager: Property not rented");
         require(property.currentTenant == tenant, "SettlementManager: Tenant mismatch");
 
         uint256 gracePeriod = warningConfig.gracePeriodDays * SECONDS_PER_DAY;
