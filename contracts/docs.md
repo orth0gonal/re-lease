@@ -498,21 +498,6 @@ function completeSettlement(uint256 propertyTokenId) external onlyRole(SETTLEMEN
 4. **Input Validation**: 모든 함수에서 철저한 입력값 검증
 5. **Access Control**: 세분화된 권한 관리 시스템
 
-## 가스 최적화
-
-### 목표 가스 사용량
-
-- **Property NFT 발행**: <150,000 gas
-- **보증금 제출**: <200,000 gas  
-- **채권 구매**: <180,000 gas
-- **정산 처리**: <120,000 gas
-
-### 최적화 전략
-
-1. **구조체 패킹**: 스토리지 슬롯 최적화
-2. **배치 처리**: 다중 계약 상태 일괄 업데이트
-3. **이벤트 기반 로깅**: 스토리지 비용 절감
-4. **View 함수 최적화**: 오프체인 쿼리 성능 향상
 
 ## 배포 및 초기화
 
