@@ -24,7 +24,7 @@ contract Deploy is Script {
     // Configuration parameters
     uint256 public constant KRW_INITIAL_SUPPLY = 100_000_000 * 1e18; // 100M KRW initial supply
     uint256 public constant INITIAL_EXCHANGE_RATE = 1e18; // 1:1 KRW to cKRW initially
-    uint256 public constant INITIAL_YIELD_RATE = 5e16;     // 5% annual yield rate
+    uint256 public constant INITIAL_YIELD_RATE = 500;      // 5% annual yield rate (in basis points)
 
     function run() external {
         // Get deployer from environment
