@@ -14,7 +14,6 @@ import "./interfaces/Structs.sol";
 /**
  * @title P2PDebtMarketplace
  * @dev Peer-to-peer marketplace for trading rental deposit debt claims
- * Gas optimization target: <180,000 gas for debt purchase
  */
 contract P2PDebtMarketplace is AccessControl, Pausable, ReentrancyGuard, IP2PDebtMarketplaceEvents {
     using SafeERC20 for IERC20;

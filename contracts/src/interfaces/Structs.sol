@@ -34,7 +34,7 @@ enum PropertyStatus {
  */
 enum DistributionChoice {
     DIRECT,       // Direct KRW distribution to landlord
-    POOL          // Hold in cKRW pool for yield optimization
+    POOL          // Hold in cKRW pool for yield generation
 }
 
 /**
@@ -48,8 +48,8 @@ struct PropertyProposal {
     bool landOwnershipAuthority;        // 땅의 소유권한
     bool landTrustAuthority;            // 땅의 신탁권한  
     uint256 ltv;                        // LTV (Loan-to-Value ratio)
-    string registrationAddress;         // 등기 주소
-    string propertyDescription;         // 매물 설명
+    bytes32 registrationAddress;         // 등기 주소
+    bytes32 propertyDescription;         // 매물 설명
     uint256 proposalTime;               // 제안 시간
     uint256 verificationDeadline;       // 검증 마감일
     bool isProcessed;                   // 처리 상태 (승인/거부됨)
@@ -76,7 +76,7 @@ struct Property {
     bool landOwnershipAuthority;        // 땅의 소유권한
     bool landTrustAuthority;            // 땅의 신탁권한  
     uint256 ltv;                        // LTV (Loan-to-Value ratio)
-    string registrationAddress;         // 등기 주소
+    bytes32 registrationAddress;         // 등기 주소
 }
 
 // ═══════════════════════════════════════════════════════════════════
