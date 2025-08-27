@@ -28,7 +28,7 @@ contract KRWToken is ERC20, AccessControl, Pausable, ERC20Burnable, IKRWTokenEve
      * @dev Constructor initializes the KRW token
      * @param initialSupply Initial supply to mint to deployer
      */
-    constructor(uint256 initialSupply) ERC20("Korean Won Token", "KRW") {
+    constructor(uint256 initialSupply) ERC20("Korean Won Token", "KRWC") {
         require(initialSupply <= MAX_SUPPLY, "KRWToken: Initial supply exceeds max supply");
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
