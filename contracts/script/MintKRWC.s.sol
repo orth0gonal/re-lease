@@ -11,7 +11,7 @@ import "../src/KRWToken.sol";
  */
 contract MintKRWC is Script {
     // Deployed contract address from kaia_testnet.json
-    address public constant KRW_TOKEN_ADDRESS = 0xfDb2145CEd8006f1311b0dE6FDeF89f3479DD6E1;
+    address public constant KRW_TOKEN_ADDRESS = 0x7a625e7F7E2feFD32aC932f9898f18Cfa7775342;
     
     // Contract instance
     KRWToken public krwToken;

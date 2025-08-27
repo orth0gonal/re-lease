@@ -57,13 +57,13 @@ contract DepositPoolTest is Test {
         
         // Distribute tokens
         vm.prank(admin);
-        krwToken.transfer(tenant, TEST_PRINCIPAL * 10); // Give tenant enough KRWC
+        krwToken.transfer(tenant, TEST_PRINCIPAL); // Give tenant enough KRWC
         
         vm.prank(admin);
-        krwToken.transfer(landlord, TEST_PRINCIPAL * 5); // Give landlord some KRWC
+        krwToken.transfer(landlord, TEST_PRINCIPAL); // Give landlord some KRWC
         
         vm.prank(admin);
-        krwToken.transfer(assignee, TEST_PRINCIPAL * 5); // Give assignee some KRWC
+        krwToken.transfer(assignee, TEST_PRINCIPAL); // Give assignee some KRWC
     }
     
     // ═══════════════════════════════════════════════════════════════════
@@ -695,10 +695,10 @@ contract DepositPoolTest is Test {
     function test_deposit_Success() public {
         uint256 assets = 1000 * 1e18;
         
-        vm.prank(admin);
+        vm.startPrank(admin);
         krwToken.approve(address(depositPool), assets);
-        
         uint256 shares = depositPool.deposit(assets, admin);
+        vm.stopPrank();
         
         assertEq(depositPool.balanceOf(admin), shares);
         assertEq(krwToken.balanceOf(address(depositPool)), assets);
@@ -708,9 +708,10 @@ contract DepositPoolTest is Test {
         uint256 assets = 1000 * 1e18;
         
         // First deposit
-        vm.prank(admin);
+        vm.startPrank(admin);
         krwToken.approve(address(depositPool), assets);
         uint256 shares = depositPool.deposit(assets, admin);
+        vm.stopPrank();
         
         // Then redeem
         uint256 initialBalance = krwToken.balanceOf(admin);
