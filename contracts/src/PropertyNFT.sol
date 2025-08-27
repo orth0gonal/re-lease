@@ -5,610 +5,418 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
 import "./interfaces/Events.sol";
 import "./interfaces/Structs.sol";
 
 /**
  * @title PropertyNFT
- * @dev NFT contract for Re-Lease rental property tokenization with enhanced status tracking
+ * @dev Re-Lease 플랫폼의 핵심 컨트랙트로, 부동산을 ERC-721 NFT로 토큰화하고 전세 계약의 전체 생명주기를 관리
+ * Implemented according to docs.md specifications
  */
 contract PropertyNFT is ERC721Enumerable, AccessControl, Pausable, ReentrancyGuard, IPropertyNFTEvents {
     // Role definitions
     bytes32 public constant PROPERTY_VERIFIER_ROLE = keccak256("PROPERTY_VERIFIER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-
     // State variables
     mapping(uint256 => Property) public properties;
-    mapping(uint256 => PropertyProposal) public propertyProposals;
-    mapping(address => uint256[]) public landlordProperties;
-    mapping(address => uint256[]) public landlordProposals;
-    mapping(address => uint256) public tenantActiveProperty;
+    mapping(uint256 => RentalContract) public rentalContracts;
     
-    uint256 private _tokenIdCounter;
-    uint256 private _proposalIdCounter;
-    uint256 public constant SETTLEMENT_GRACE_PERIOD = 30 days;
-    uint256 public constant VERIFICATION_TIMEOUT = 7 days;
-    uint256 public constant PROPOSAL_VERIFICATION_PERIOD = 14 days;
-
+    uint256 private _propertyIdCounter = 1; // Start from 1 to avoid ID 0
+    uint256 private _nextNftId = 1; // NFT IDs start from 1
+    
+    // Constants
+    uint256 public constant VERIFICATION_PERIOD = 14 days;
+    uint256 public constant GRACE_PERIOD = 1 days;
 
     /**
-     * @dev Constructor initializes the contract with name and symbol
+     * @dev Constructor initializes the contract
      */
     constructor() ERC721("Re-Lease Property", "RLP") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PROPERTY_VERIFIER_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
-        _tokenIdCounter = 1; // Start from 1 to avoid tokenId 0
-        _proposalIdCounter = 1; // Start from 1 to avoid proposalId 0
     }
 
     /**
-     * @dev Landlord proposes a property for listing
-     * @param distributionChoice Landlord's preferred distribution method
-     * @param depositAmount Required deposit amount in KRW
-     * @param landOwnershipAuthority Whether landlord has land ownership authority
-     * @param landTrustAuthority Whether landlord has land trust authority
-     * @param ltv Loan-to-Value ratio for the property
-     * @param registrationAddress Registration address of the property
-     * @param propertyDescription Description of the property
-     * @return proposalId The newly created proposal ID
+     * @dev 임대인이 매물을 제안합니다. Property.status가 PENDING 상태로 Property 구조체가 생성되며 14일의 검증 기간이 주어집니다.
+     * @param landlord 임대인 이더리움 주소
+     * @param trustAuthority 신탁사 이더리움 주소(없으면 zero address)
+     * @param ltv LTV 비율
+     * @param registrationAddress 등기 도로명 주소
+     * @return propertyId The newly created property ID
      */
-    function proposeProperty(
-        DistributionChoice distributionChoice,
-        uint256 depositAmount,
-        bool landOwnershipAuthority,
-        bool landTrustAuthority,
+    function registerProperty(
+        address landlord,
+        address trustAuthority,
         uint256 ltv,
-        bytes32 registrationAddress,
-        bytes32 propertyDescription
-    ) external whenNotPaused nonReentrant returns (uint256) {
-        require(depositAmount > 0, "PropertyNFT: Deposit amount must be positive");
-        require(registrationAddress.length > 0, "PropertyNFT: Registration address cannot be empty");
-        require(propertyDescription.length > 0, "PropertyNFT: Property description cannot be empty");
+        bytes32 registrationAddress
+    ) external whenNotPaused nonReentrant returns (uint256 propertyId) {
+        require(landlord != address(0), "PropertyNFT: Invalid landlord address");
+        require(registrationAddress != bytes32(0), "PropertyNFT: Registration address cannot be empty");
         require(ltv <= 10000, "PropertyNFT: LTV cannot exceed 100% (10000 basis points)");
 
-        uint256 proposalId = _proposalIdCounter++;
-
-        // Create property proposal
-        propertyProposals[proposalId] = PropertyProposal({
-            landlord: msg.sender,
-            distributionChoice: distributionChoice,
-            depositAmount: depositAmount,
-            landOwnershipAuthority: landOwnershipAuthority,
-            landTrustAuthority: landTrustAuthority,
-            ltv: ltv,
+        propertyId = _propertyIdCounter++;
+        
+        // Create property with PENDING status
+        properties[propertyId] = Property({
+            landlord: landlord,
+            status: PropertyStatus.PENDING,
+            trustAuthority: trustAuthority,
             registrationAddress: registrationAddress,
-            propertyDescription: propertyDescription,
-            proposalTime: block.timestamp,
-            verificationDeadline: block.timestamp + PROPOSAL_VERIFICATION_PERIOD,
-            isProcessed: false
+            ltv: ltv
         });
 
-        // Update landlord's proposal list
-        landlordProposals[msg.sender].push(proposalId);
-
         emit PropertyProposed(
-            proposalId,
-            msg.sender,
-            distributionChoice,
-            depositAmount,
+            propertyId,
+            landlord,
             ltv,
-            registrationAddress,
-            propertyDescription
+            registrationAddress
         );
 
-        return proposalId;
+        return propertyId;
     }
 
     /**
-     * @dev Approve a property proposal and mint NFT
-     * @param proposalId The proposal ID to approve
-     * @return tokenId The newly minted token ID
+     * @dev 검증자가 매물을 승인합니다. Property.status가 REGISTERED 상태로 변경되고 임대 가능한 상태가 됩니다.
+     * @param propertyId The property ID to approve
+     * @return nftId The newly minted NFT token ID
      */
-    function approvePropertyProposal(uint256 proposalId) 
+    function approveProperty(uint256 propertyId) 
         external 
         onlyRole(PROPERTY_VERIFIER_ROLE) 
         whenNotPaused 
-        nonReentrant 
-        returns (uint256) 
+        returns (uint256 nftId) 
     {
-        PropertyProposal storage proposal = propertyProposals[proposalId];
-        require(proposal.landlord != address(0), "PropertyNFT: Proposal does not exist");
-        require(!proposal.isProcessed, "PropertyNFT: Proposal already processed");
-        require(block.timestamp <= proposal.verificationDeadline, "PropertyNFT: Proposal verification deadline passed");
-
-        // Use internal _mintProperty function to create the NFT
-        uint256 tokenId = _mintProperty(
-            proposal.landlord,
-            proposal.distributionChoice,
-            proposal.depositAmount,
-            proposal.landOwnershipAuthority,
-            proposal.landTrustAuthority,
-            proposal.ltv,
-            proposal.registrationAddress
-        );
-
-        // Set the proposal ID to link property with its original proposal
-        properties[tokenId].proposalId = proposalId;
-
-        // Mark proposal as processed
-        proposal.isProcessed = true;
-
-        emit PropertyProposalApproved(proposalId, tokenId, msg.sender);
-
-        return tokenId;
-    }
-
-    /**
-     * @dev Reject a property proposal
-     * @param proposalId The proposal ID to reject
-     * @param reason Reason for rejection
-     */
-    function rejectPropertyProposal(
-        uint256 proposalId,
-        string calldata reason
-    ) external onlyRole(PROPERTY_VERIFIER_ROLE) whenNotPaused {
-        PropertyProposal storage proposal = propertyProposals[proposalId];
-        require(proposal.landlord != address(0), "PropertyNFT: Proposal does not exist");
-        require(!proposal.isProcessed, "PropertyNFT: Proposal already processed");
-        require(bytes(reason).length > 0, "PropertyNFT: Rejection reason cannot be empty");
-
-        // Mark proposal as processed
-        proposal.isProcessed = true;
-
-        emit PropertyProposalRejected(proposalId, msg.sender, reason);
-    }
-
-    /**
-     * @dev Internal function to mint a new property NFT with landlord distribution choice and property details
-     * @param landlord Address of the property owner
-     * @param distributionChoice Landlord's preferred distribution method
-     * @param depositAmount Required deposit amount in KRW
-     * @param landOwnershipAuthority Whether landlord has land ownership authority
-     * @param landTrustAuthority Whether landlord has land trust authority
-     * @param ltv Loan-to-Value ratio for the property
-     * @param registrationAddress Registration address of the property
-     * @return tokenId The newly minted token ID
-     */
-    function _mintProperty(
-        address landlord,
-        DistributionChoice distributionChoice,
-        uint256 depositAmount,
-        bool landOwnershipAuthority,
-        bool landTrustAuthority,
-        uint256 ltv,
-        bytes32 registrationAddress
-    ) internal returns (uint256) {
-        require(landlord != address(0), "PropertyNFT: Invalid landlord address");
-        require(depositAmount > 0, "PropertyNFT: Deposit amount must be positive");
-        require(registrationAddress.length > 0, "PropertyNFT: Registration address cannot be empty");
-        require(ltv <= 10000, "PropertyNFT: LTV cannot exceed 100% (10000 basis points)");
-
-        uint256 tokenId = _tokenIdCounter++;
-
-        // Mint the NFT to the landlord
-        _mint(landlord, tokenId);
-
-        // Initialize property data
-        properties[tokenId] = Property({
-            landlord: landlord,
-            status: PropertyStatus.PENDING,
-            distributionChoice: distributionChoice,
-            depositAmount: depositAmount,
-            contractStartTime: 0,
-            contractEndTime: 0,
-            settlementDeadline: 0,
-            currentTenant: address(0),
-            proposedTenant: address(0),
-            proposedDepositAmount: 0,
-            isVerified: false,
-            createdAt: block.timestamp,
-            proposalId: 0, // Direct minting, not from proposal
-            landOwnershipAuthority: landOwnershipAuthority,
-            landTrustAuthority: landTrustAuthority,
-            ltv: ltv,
-            registrationAddress: registrationAddress
-        });
-
-        // Update landlord's property list
-        landlordProperties[landlord].push(tokenId);
-
-        emit PropertyMinted(tokenId, landlord, distributionChoice, depositAmount, ltv, registrationAddress);
-
-        return tokenId;
-    }
-
-    /**
-     * @dev Verify a property and set it to ACTIVE status
-     * @param tokenId The property token ID to verify
-     */
-    function verifyProperty(uint256 tokenId) external onlyRole(PROPERTY_VERIFIER_ROLE) {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        Property storage property = properties[tokenId];
+        require(_propertyExists(propertyId), "PropertyNFT: Property does not exist");
+        Property storage property = properties[propertyId];
         require(property.status == PropertyStatus.PENDING, "PropertyNFT: Property not in pending status");
-        require(!property.isVerified, "PropertyNFT: Property already verified");
 
-        property.isVerified = true;
-        _updatePropertyStatus(tokenId, PropertyStatus.ACTIVE);
+        // Update property status to REGISTERED
+        property.status = PropertyStatus.REGISTERED;
+        
+        // Mint NFT to landlord
+        nftId = _nextNftId++;
+        _mint(property.landlord, nftId);
+
+        emit PropertyApproved(propertyId, msg.sender);
+        emit PropertyStatusUpdated(propertyId, PropertyStatus.PENDING, PropertyStatus.REGISTERED);
+
+        return nftId;
     }
 
     /**
-     * @dev Set property as rented with tenant and contract details
-     * @param tokenId The property token ID
-     * @param tenant Address of the tenant
-     * @param contractStartTime Rental contract start timestamp
-     * @param contractEndTime Rental contract end timestamp
+     * @dev 검증자가 매물을 거부합니다. nft가 생성되지 않습니다.
+     * @param propertyId The property ID to reject
      */
-    function setPropertyRented(
-        uint256 tokenId,
-        address tenant,
-        uint256 contractStartTime,
-        uint256 contractEndTime
-    ) external onlyRole(PROPERTY_VERIFIER_ROLE) {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        require(tenant != address(0), "PropertyNFT: Invalid tenant address");
-        require(contractStartTime < contractEndTime, "PropertyNFT: Invalid contract period");
-        require(contractStartTime >= block.timestamp, "PropertyNFT: Contract start time in the past");
+    function rejectProperty(uint256 propertyId) 
+        external 
+        onlyRole(PROPERTY_VERIFIER_ROLE) 
+        whenNotPaused 
+    {
+        require(_propertyExists(propertyId), "PropertyNFT: Property does not exist");
+        Property storage property = properties[propertyId];
+        require(property.status == PropertyStatus.PENDING, "PropertyNFT: Property not in pending status");
 
-        Property storage property = properties[tokenId];
-        require(property.status == PropertyStatus.ACTIVE, "PropertyNFT: Property not available for rent");
-        require(tenantActiveProperty[tenant] == 0, "PropertyNFT: Tenant already has active property");
+        PropertyStatus oldStatus = property.status;
+        property.status = PropertyStatus.SUSPENDED;
 
-        property.currentTenant = tenant;
-        property.contractStartTime = contractStartTime;
-        property.contractEndTime = contractEndTime;
-        tenantActiveProperty[tenant] = tokenId;
-
-        _updatePropertyStatus(tokenId, PropertyStatus.RENTED);
-
-        emit PropertyRented(tokenId, tenant, contractStartTime, contractEndTime);
+        emit PropertyRejected(propertyId, msg.sender, "Property rejected by verifier");
+        emit PropertyStatusUpdated(propertyId, oldStatus, PropertyStatus.SUSPENDED);
     }
 
     /**
-     * @dev Create a rental contract proposal by landlord
-     * @param tokenId The property token ID
-     * @param tenant Address of the proposed tenant
-     * @param contractStartTime Rental contract start timestamp
-     * @param contractEndTime Rental contract end timestamp
-     * @param proposedDepositAmount Proposed deposit amount
+     * @dev 임대인이 특정 부동산에 대한 전세 계약을 생성합니다. 계약 생성 시 RentalContract.status가 PENDING 상태로 생성됩니다.
+     * @param nftId 연관된 부동산 NFT ID
+     * @param tenant 임차인 주소
+     * @param contractStartDate 계약 시작 시간
+     * @param contractEndDate 계약 만료 시간
+     * @param principal 계약 보증금 (KRWC) - 원금
+     * @param debtInterestRate 미상환 시 연간 이자율 (basis points, 예: 500 = 5%)
      */
     function createRentalContract(
-        uint256 tokenId,
+        uint256 nftId,
         address tenant,
-        uint256 contractStartTime,
-        uint256 contractEndTime,
-        uint256 proposedDepositAmount
-    ) external {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
+        uint256 contractStartDate,
+        uint256 contractEndDate,
+        uint256 principal,
+        uint256 debtInterestRate
+    ) external whenNotPaused nonReentrant {
+        require(_ownerOf(nftId) == msg.sender, "PropertyNFT: Only NFT owner can create rental contract");
         require(tenant != address(0), "PropertyNFT: Invalid tenant address");
-        require(contractStartTime < contractEndTime, "PropertyNFT: Invalid contract period");
-        require(contractStartTime >= block.timestamp, "PropertyNFT: Contract start time in the past");
-        require(proposedDepositAmount > 0, "PropertyNFT: Deposit amount must be positive");
+        require(principal > 0, "PropertyNFT: Principal must be positive");
+        require(contractStartDate < contractEndDate, "PropertyNFT: Invalid contract period");
+        require(debtInterestRate <= 10000, "PropertyNFT: Interest rate too high"); // Max 100%
+        require(rentalContracts[nftId].nftId == 0, "PropertyNFT: Rental contract already exists for this NFT");
 
-        Property storage property = properties[tokenId];
-        require(msg.sender == property.landlord, "PropertyNFT: Only property owner can create rental contract");
-        require(property.status == PropertyStatus.ACTIVE, "PropertyNFT: Property not available for rent");
-        require(tenantActiveProperty[tenant] == 0, "PropertyNFT: Tenant already has active property");
+        // Create rental contract with PENDING status
+        rentalContracts[nftId] = RentalContract({
+            nftId: nftId,
+            tenantOrAssignee: tenant,
+            principal: principal,
+            startDate: contractStartDate,
+            endDate: contractEndDate,
+            status: RentalContractStatus.PENDING,
+            debtInterestRate: debtInterestRate,
+            totalRepaidAmount: principal,
+            currentRepaidAmount: 0,
+            lastRepaymentTime: 0
+        });
 
-        property.proposedTenant = tenant;
-        property.contractStartTime = contractStartTime;
-        property.contractEndTime = contractEndTime;
-        property.proposedDepositAmount = proposedDepositAmount;
-
-        _updatePropertyStatus(tokenId, PropertyStatus.CONTRACT_PENDING);
-
-        emit RentalContractCreated(tokenId, tenant, contractStartTime, contractEndTime, proposedDepositAmount);
-    }
-
-    /**
-     * @dev Verify rental contract by admin
-     * @param tokenId The property token ID
-     */
-    function verifyRentalContract(uint256 tokenId) external onlyRole(PROPERTY_VERIFIER_ROLE) {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        Property storage property = properties[tokenId];
-        require(property.status == PropertyStatus.CONTRACT_PENDING, "PropertyNFT: Contract not pending verification");
-        require(property.proposedTenant != address(0), "PropertyNFT: No proposed tenant");
-
-        _updatePropertyStatus(tokenId, PropertyStatus.CONTRACT_VERIFIED);
-
-        emit RentalContractVerified(tokenId, msg.sender);
-    }
-
-    /**
-     * @dev Finalize rental contract after deposit is submitted
-     * @param tokenId The property token ID
-     */
-    function finalizeRentalContract(uint256 tokenId) external onlyRole(PROPERTY_VERIFIER_ROLE) {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        Property storage property = properties[tokenId];
-        require(property.status == PropertyStatus.CONTRACT_VERIFIED, "PropertyNFT: Contract not verified");
-        require(property.proposedTenant != address(0), "PropertyNFT: No proposed tenant");
-
-        // Set current tenant and clear proposed tenant
-        property.currentTenant = property.proposedTenant;
-        tenantActiveProperty[property.proposedTenant] = tokenId;
-        
-        // Clear proposed data
-        property.proposedTenant = address(0);
-        property.proposedDepositAmount = 0;
-
-        _updatePropertyStatus(tokenId, PropertyStatus.RENTED);
-
-        emit RentalContractFinalized(tokenId, property.currentTenant);
-    }
-
-    /**
-     * @dev Initiate settlement process for a property
-     * @param tokenId The property token ID
-     */
-    function initiateSettlement(uint256 tokenId) external {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        Property storage property = properties[tokenId];
-        require(property.status == PropertyStatus.RENTED, "PropertyNFT: Property not rented");
-        require(
-            msg.sender == property.landlord || msg.sender == property.currentTenant,
-            "PropertyNFT: Only landlord or tenant can initiate settlement"
+        emit RentalContractCreated(
+            nftId,
+            tenant,
+            principal,
+            contractStartDate,
+            contractEndDate,
+            debtInterestRate
         );
-        require(block.timestamp >= property.contractEndTime, "PropertyNFT: Contract period not ended");
-
-        property.settlementDeadline = block.timestamp + SETTLEMENT_GRACE_PERIOD;
-        _updatePropertyStatus(tokenId, PropertyStatus.SETTLEMENT);
-
-        emit SettlementInitiated(tokenId, property.settlementDeadline);
     }
 
     /**
-     * @dev Complete settlement for a property
-     * @param tokenId The property token ID
+     * @dev Activate rental contract (called by DepositPool after deposit submission)
+     * @param nftId The NFT ID
      */
-    function completeSettlement(uint256 tokenId) external onlyRole(PROPERTY_VERIFIER_ROLE) {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        Property storage property = properties[tokenId];
-        require(property.status == PropertyStatus.SETTLEMENT, "PropertyNFT: Property not in settlement");
-
-        // Clear tenant data
-        address tenant = property.currentTenant;
-        property.currentTenant = address(0);
-        property.contractStartTime = 0;
-        property.contractEndTime = 0;
-        property.settlementDeadline = 0;
+    function activeRentalContractStatus(uint256 nftId) external {
+        require(_ownerOf(nftId) != address(0), "PropertyNFT: NFT does not exist");
+        RentalContract storage rentalContract = rentalContracts[nftId];
+        require(rentalContract.nftId != 0, "PropertyNFT: Rental contract does not exist");
+        require(rentalContract.status == RentalContractStatus.PENDING, "PropertyNFT: Contract not pending");
         
-        if (tenant != address(0)) {
-            tenantActiveProperty[tenant] = 0;
-        }
+        // Check if contract start date is within 1 day of current time (as per docs)
+        require(
+            block.timestamp >= rentalContract.startDate - 1 days &&
+            block.timestamp <= rentalContract.startDate + 1 days,
+            "PropertyNFT: Contract start date not within valid range"
+        );
 
-        _updatePropertyStatus(tokenId, PropertyStatus.COMPLETED);
+        rentalContract.status = RentalContractStatus.ACTIVE;
     }
 
     /**
-     * @dev Check and mark properties as overdue if settlement deadline passed
-     * @param tokenId The property token ID to check
+     * @dev 계약 만료 후 1일 유예기간이 지난 매물에 대해 누구나 호출할 수 있는 함수입니다.
+     * 호출되면 Property.status가 SUSPENDED 변경, RentalContract.status가 OUTSTANDING로 변경
+     * @param nftId The NFT ID to list as debt
      */
-    function checkSettlementOverdue(uint256 tokenId) external {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        Property storage property = properties[tokenId];
-        require(property.status == PropertyStatus.SETTLEMENT, "PropertyNFT: Property not in settlement");
-        require(block.timestamp > property.settlementDeadline, "PropertyNFT: Settlement deadline not passed");
+    function outstandingProperty(uint256 nftId) external whenNotPaused {
+        require(_ownerOf(nftId) != address(0), "PropertyNFT: NFT does not exist");
+        RentalContract storage rentalContract = rentalContracts[nftId];
+        require(rentalContract.nftId != 0, "PropertyNFT: Rental contract does not exist");
+        require(rentalContract.status == RentalContractStatus.ACTIVE, "PropertyNFT: Contract not active");
+        require(
+            block.timestamp > rentalContract.endDate + GRACE_PERIOD,
+            "PropertyNFT: Grace period not passed"
+        );
 
-        _updatePropertyStatus(tokenId, PropertyStatus.OVERDUE);
-        emit PropertyOverdue(tokenId, block.timestamp);
-    }
-
-    /**
-     * @dev Update landlord distribution choice
-     * @param tokenId The property token ID
-     * @param newChoice New distribution choice
-     */
-    function updateDistributionChoice(
-        uint256 tokenId,
-        DistributionChoice newChoice
-    ) external {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        Property storage property = properties[tokenId];
-        require(msg.sender == property.landlord, "PropertyNFT: Only landlord can update distribution choice");
-        require(property.status != PropertyStatus.RENTED, "PropertyNFT: Cannot change while rented");
-
-        DistributionChoice oldChoice = property.distributionChoice;
-        property.distributionChoice = newChoice;
-
-        emit DistributionChoiceUpdated(tokenId, oldChoice, newChoice);
-    }
-
-    /**
-     * @dev Update property LTV (Loan-to-Value ratio)
-     * @param tokenId The property token ID
-     * @param newLtv New LTV value (in basis points, max 10000 = 100%)
-     */
-    function updateLTV(uint256 tokenId, uint256 newLtv) external onlyRole(PROPERTY_VERIFIER_ROLE) {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        require(newLtv <= 10000, "PropertyNFT: LTV cannot exceed 100% (10000 basis points)");
+        // Find property ID associated with this NFT (simplified approach)
+        uint256 propertyId = _findPropertyIdByNftId(nftId);
+        require(propertyId != 0, "PropertyNFT: Property not found for NFT");
         
-        properties[tokenId].ltv = newLtv;
-    }
-
-    /**
-     * @dev Update land ownership authority
-     * @param tokenId The property token ID
-     * @param hasAuthority Whether landlord has land ownership authority
-     */
-    function updateLandOwnershipAuthority(uint256 tokenId, bool hasAuthority) external onlyRole(PROPERTY_VERIFIER_ROLE) {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
+        Property storage property = properties[propertyId];
         
-        properties[tokenId].landOwnershipAuthority = hasAuthority;
-    }
-
-    /**
-     * @dev Update land trust authority
-     * @param tokenId The property token ID
-     * @param hasAuthority Whether landlord has land trust authority
-     */
-    function updateLandTrustAuthority(uint256 tokenId, bool hasAuthority) external onlyRole(PROPERTY_VERIFIER_ROLE) {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        
-        properties[tokenId].landTrustAuthority = hasAuthority;
-    }
-
-    /**
-     * @dev Update registration address
-     * @param tokenId The property token ID
-     * @param newAddress New registration address
-     */
-    function updateRegistrationAddress(uint256 tokenId, string calldata newAddress) external onlyRole(PROPERTY_VERIFIER_ROLE) {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        require(bytes(newAddress).length > 0, "PropertyNFT: Registration address cannot be empty");
-        
-        properties[tokenId].registrationAddress = keccak256(bytes(newAddress));
-    }
-
-    /**
-     * @dev Internal function to update property status with event emission
-     * @param tokenId The property token ID
-     * @param newStatus New status to set
-     */
-    function _updatePropertyStatus(uint256 tokenId, PropertyStatus newStatus) internal {
-        Property storage property = properties[tokenId];
+        // Update statuses
         PropertyStatus oldStatus = property.status;
-        property.status = newStatus;
-        
-        emit PropertyStatusUpdated(tokenId, oldStatus, newStatus);
+        property.status = PropertyStatus.SUSPENDED;
+        rentalContract.status = RentalContractStatus.OUTSTANDING;
+
+        emit PropertyStatusUpdated(propertyId, oldStatus, PropertyStatus.SUSPENDED);
+        emit DebtPropertyListed(nftId, rentalContract.principal, rentalContract.debtInterestRate);
     }
 
     /**
-     * @dev Internal helper function to check if token exists
-     * @param tokenId The token ID to check
-     * @return True if token exists
+     * @dev Complete rental contract (called by DepositPool)
+     * @param nftId The NFT ID
      */
-    function _tokenExists(uint256 tokenId) internal view returns (bool) {
-        return _ownerOf(tokenId) != address(0);
+    function completedRentalContractStatus(uint256 nftId) external {
+        require(_ownerOf(nftId) != address(0), "PropertyNFT: NFT does not exist");
+        RentalContract storage rentalContract = rentalContracts[nftId];
+        require(rentalContract.nftId != 0, "PropertyNFT: Rental contract does not exist");
+        
+        rentalContract.status = RentalContractStatus.COMPLETED;
+        
+        // Find and update property status
+        uint256 propertyId = _findPropertyIdByNftId(nftId);
+        if (propertyId != 0) {
+            Property storage property = properties[propertyId];
+            PropertyStatus oldStatus = property.status;
+            property.status = PropertyStatus.REGISTERED; // Back to available for rent
+            emit PropertyStatusUpdated(propertyId, oldStatus, PropertyStatus.REGISTERED);
+        }
+    }
+
+    /**
+     * @dev Transfer debt claim to new assignee (called by DepositPool)
+     * @param nftId The NFT ID
+     * @param newAssignee The new assignee address
+     */
+    function transferDebt(uint256 nftId, address newAssignee) external {
+        require(_ownerOf(nftId) != address(0), "PropertyNFT: NFT does not exist");
+        require(newAssignee != address(0), "PropertyNFT: Invalid assignee address");
+        
+        RentalContract storage rentalContract = rentalContracts[nftId];
+        require(rentalContract.nftId != 0, "PropertyNFT: Rental contract does not exist");
+        require(rentalContract.status == RentalContractStatus.OUTSTANDING, "PropertyNFT: Contract not outstanding");
+        
+        rentalContract.tenantOrAssignee = newAssignee;
+    }
+
+    function _incrementTotalRepaidAmount(uint256 nftId, uint256 amount) internal {
+        RentalContract storage rentalContract = rentalContracts[nftId];
+        rentalContract.totalRepaidAmount += amount;
+    }
+    function incrementTotalRepaidAmount(uint256 nftId, uint256 amount) external {
+        _incrementTotalRepaidAmount(nftId, amount);
+    }
+
+    function _incrementCurrentRepaidAmount(uint256 nftId, uint256 amount) internal {
+        RentalContract storage rentalContract = rentalContracts[nftId];
+        rentalContract.currentRepaidAmount += amount;
+    }
+
+    function incrementCurrentRepaidAmount(uint256 nftId, uint256 amount) external {
+        _incrementCurrentRepaidAmount(nftId, amount);
+    }
+
+    function _updateLastRepaymentTime(uint256 nftId, uint256 time) internal {
+        RentalContract storage rentalContract = rentalContracts[nftId];
+        require(time > rentalContract.lastRepaymentTime, "PropertyNFT: Invalid time");
+        rentalContract.lastRepaymentTime = time;
+    }
+    function updateLastRepaymentTime(uint256 nftId, uint256 time) external {
+        _updateLastRepaymentTime(nftId, time);
     }
 
     /**
      * @dev Get property information
-     * @param tokenId The property token ID
-     * @return Property struct containing all property data
+     * @param propertyId The property ID
+     * @return Property struct
      */
-    function getProperty(uint256 tokenId) external view returns (Property memory) {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        return properties[tokenId];
+    function getProperty(uint256 propertyId) external view returns (Property memory) {
+        require(_propertyExists(propertyId), "PropertyNFT: Property does not exist");
+        return properties[propertyId];
+    }
+
+    /**
+     * @dev Get rental contract information
+     * @param nftId The NFT ID
+     * @return RentalContract struct
+     */
+    function getRentalContract(uint256 nftId) external view returns (RentalContract memory) {
+        require(_ownerOf(nftId) != address(0), "PropertyNFT: NFT does not exist");
+        require(rentalContracts[nftId].nftId != 0, "PropertyNFT: Rental contract does not exist");
+        return rentalContracts[nftId];
+    }
+
+    /**
+     * @dev Check if property exists
+     * @param propertyId The property ID
+     * @return True if property exists
+     */
+    function _propertyExists(uint256 propertyId) internal view returns (bool) {
+        return propertyId > 0 && propertyId < _propertyIdCounter;
+    }
+
+    /**
+     * @dev Find property ID associated with NFT ID (simplified implementation)
+     * In a production system, this would be more efficiently tracked
+     * @param nftId The NFT ID
+     * @return propertyId The associated property ID (0 if not found)
+     */
+    function _findPropertyIdByNftId(uint256 nftId) internal view returns (uint256 propertyId) {
+        address nftOwner = _ownerOf(nftId);
+        
+        // Search through properties to find match by landlord
+        // This is a simplified implementation - in production, use a mapping
+        for (uint256 i = 1; i < _propertyIdCounter; i++) {
+            if (properties[i].landlord == nftOwner && properties[i].status != PropertyStatus.PENDING) {
+                return i;
+            }
+        }
+        return 0;
     }
 
     /**
      * @dev Get properties owned by a landlord
      * @param landlord The landlord address
-     * @return Array of token IDs owned by the landlord
+     * @return Array of property IDs owned by the landlord
      */
     function getLandlordProperties(address landlord) external view returns (uint256[] memory) {
-        return landlordProperties[landlord];
-    }
-
-    /**
-     * @dev Check if settlement is overdue for a property
-     * @param tokenId The property token ID
-     * @return True if settlement is overdue
-     */
-    function isSettlementOverdue(uint256 tokenId) external view returns (bool) {
-        require(_tokenExists(tokenId), "PropertyNFT: Property does not exist");
-        Property memory property = properties[tokenId];
+        uint256[] memory tempResults = new uint256[](_propertyIdCounter - 1);
+        uint256 resultCount = 0;
         
-        return property.status == PropertyStatus.SETTLEMENT && 
-               property.settlementDeadline > 0 && 
-               block.timestamp > property.settlementDeadline;
-    }
-
-    /**
-     * @dev Get current token ID counter
-     * @return Current token ID counter value
-     */
-    function getCurrentTokenId() external view returns (uint256) {
-        return _tokenIdCounter;
-    }
-
-    /**
-     * @dev Get current proposal ID counter
-     * @return Current proposal ID counter value
-     */
-    function getCurrentProposalId() external view returns (uint256) {
-        return _proposalIdCounter;
-    }
-
-    /**
-     * @dev Get property proposal information
-     * @param proposalId The proposal ID
-     * @return PropertyProposal struct containing all proposal data
-     */
-    function getPropertyProposal(uint256 proposalId) external view returns (PropertyProposal memory) {
-        PropertyProposal memory proposal = propertyProposals[proposalId];
-        require(proposal.landlord != address(0), "PropertyNFT: Proposal does not exist");
-        return proposal;
-    }
-
-    /**
-     * @dev Get proposals by a landlord
-     * @param landlord The landlord address
-     * @return Array of proposal IDs by the landlord
-     */
-    function getLandlordProposals(address landlord) external view returns (uint256[] memory) {
-        return landlordProposals[landlord];
-    }
-
-    /**
-     * @dev Get pending proposals (not processed and within deadline)
-     * @return Array of pending proposal IDs
-     */
-    function getPendingProposals() external view returns (uint256[] memory) {
-        uint256 totalProposals = _proposalIdCounter - 1;
-        uint256[] memory tempPending = new uint256[](totalProposals);
-        uint256 pendingCount = 0;
-
-        for (uint256 i = 1; i <= totalProposals; i++) {
-            PropertyProposal memory proposal = propertyProposals[i];
-            if (!proposal.isProcessed && 
-                proposal.landlord != address(0) &&
-                block.timestamp <= proposal.verificationDeadline) {
-                tempPending[pendingCount] = i;
-                pendingCount++;
+        for (uint256 i = 1; i < _propertyIdCounter; i++) {
+            if (properties[i].landlord == landlord) {
+                tempResults[resultCount] = i;
+                resultCount++;
             }
         }
-
+        
         // Create final array with exact size
-        uint256[] memory pendingProposals = new uint256[](pendingCount);
-        for (uint256 i = 0; i < pendingCount; i++) {
-            pendingProposals[i] = tempPending[i];
+        uint256[] memory results = new uint256[](resultCount);
+        for (uint256 i = 0; i < resultCount; i++) {
+            results[i] = tempResults[i];
         }
-
-        return pendingProposals;
+        
+        return results;
     }
 
     /**
-     * @dev Check if a proposal is expired
-     * @param proposalId The proposal ID to check
-     * @return True if proposal is expired
+     * @dev Get all rental contracts with a specific status
+     * @param status The status to filter by
+     * @return Array of NFT IDs with rental contracts of the specified status
      */
-    function isProposalExpired(uint256 proposalId) external view returns (bool) {
-        PropertyProposal memory proposal = propertyProposals[proposalId];
-        require(proposal.landlord != address(0), "PropertyNFT: Proposal does not exist");
+    function getRentalContractsByStatus(RentalContractStatus status) external view returns (uint256[] memory) {
+        uint256[] memory tempResults = new uint256[](_nextNftId - 1);
+        uint256 resultCount = 0;
         
-        return !proposal.isProcessed && block.timestamp > proposal.verificationDeadline;
+        for (uint256 i = 1; i < _nextNftId; i++) {
+            if (rentalContracts[i].nftId != 0 && rentalContracts[i].status == status) {
+                tempResults[resultCount] = i;
+                resultCount++;
+            }
+        }
+        
+        // Create final array with exact size
+        uint256[] memory results = new uint256[](resultCount);
+        for (uint256 i = 0; i < resultCount; i++) {
+            results[i] = tempResults[i];
+        }
+        
+        return results;
     }
 
     /**
-     * @dev Override tokenURI to return property-specific metadata
-     * @param tokenId The property token ID
-     * @return The URI for the token metadata
+     * @dev Override _update to add automatic listDebtProperty call
+     * This ensures listDebtProperty is called automatically when needed
      */
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        require(_tokenExists(tokenId), "PropertyNFT: URI query for nonexistent token");
+    function _update(address to, uint256 tokenId, address auth) 
+        internal 
+        override(ERC721Enumerable) 
+        whenNotPaused 
+        returns (address) 
+    {
+        // Check if we need to automatically list debt property
+        if (_ownerOf(tokenId) != address(0)) {
+            RentalContract storage rentalContract = rentalContracts[tokenId];
+            if (rentalContract.nftId != 0 && 
+                rentalContract.status == RentalContractStatus.ACTIVE &&
+                block.timestamp > rentalContract.endDate + GRACE_PERIOD) {
+                
+                // Automatically list as debt property
+                uint256 propertyId = _findPropertyIdByNftId(tokenId);
+                if (propertyId != 0) {
+                    Property storage property = properties[propertyId];
+                    PropertyStatus oldStatus = property.status;
+                    property.status = PropertyStatus.SUSPENDED;
+                    rentalContract.status = RentalContractStatus.OUTSTANDING;
+                    
+                    emit PropertyStatusUpdated(propertyId, oldStatus, PropertyStatus.SUSPENDED);
+                    emit DebtPropertyListed(tokenId, rentalContract.principal, rentalContract.debtInterestRate);
+                }
+            }
+        }
         
-        // Return a default metadata URI based on token ID
-        // In production, this could be a proper metadata service
-        return string(abi.encodePacked(
-            "https://api.re-lease.kr/metadata/",
-            Strings.toString(tokenId),
-            ".json"
-        ));
+        return super._update(to, tokenId, auth);
     }
 
     /**
@@ -628,18 +436,13 @@ contract PropertyNFT is ERC721Enumerable, AccessControl, Pausable, ReentrancyGua
     /**
      * @dev See {IERC165-supportsInterface}
      */
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Enumerable, AccessControl) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) 
+        public 
+        view 
+        virtual 
+        override(ERC721Enumerable, AccessControl) 
+        returns (bool) 
+    {
         return super.supportsInterface(interfaceId);
-    }
-
-    /**
-     * @dev Override _update to add pause functionality and ERC721Enumerable support
-     */
-    function _update(
-        address to,
-        uint256 tokenId,
-        address auth
-    ) internal override(ERC721Enumerable) whenNotPaused returns (address) {
-        return super._update(to, tokenId, auth);
     }
 }
