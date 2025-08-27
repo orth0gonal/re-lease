@@ -12,48 +12,42 @@ import "./interfaces/Structs.sol";
 
 /**
  * @title DepositPool
- * @dev ERC-4626 Vault for rental deposits with KRW→cKRW conversion and landlord distribution choices
+ * @dev DepositPool은 ERC-4626 Vault 표준을 구현하여 KRWC 보증금을 yKRWC로 변환하고 수익을 생성합니다.
+ * asset 토큰은 KRWC 토큰이며, shares 토큰은 yKRWC 토큰입니다.
+ * Implemented according to docs.md specifications
  */
 contract DepositPool is ERC4626, AccessControl, Pausable, ReentrancyGuard, IDepositPoolEvents {
     using SafeERC20 for IERC20;
+
+    // NFT ID별로 이미 클레임된 총 이자 금액을 추적
+    mapping(uint256 => uint256) private _unclaimedPrincipalAndInterest;
+    // NFT ID별로 마지막 이자 클레임 시점을 추적 (추가적인 검증용)
+    mapping(uint256 => uint256) private _lastClaimTime;
+
     // Role definitions
     bytes32 public constant POOL_MANAGER_ROLE = keccak256("POOL_MANAGER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant YIELD_MANAGER_ROLE = keccak256("YIELD_MANAGER_ROLE");
 
-
-    // State variables
+    // PropertyNFT contract
     PropertyNFT public immutable propertyNFT;
     
-    mapping(uint256 => DepositInfo) public deposits;
-    mapping(address => uint256[]) public tenantDeposits;
-    mapping(address => uint256[]) public landlordDeposits;
-    
-    uint256 public totalActiveDeposits;
-    uint256 public totalYieldDistributed;
-    uint256 public annualYieldRate; // Annual yield rate in basis points (e.g., 500 = 5%)
-    uint256 public constant MIN_DEPOSIT_AMOUNT = 1000 * 1e18; // 1,000 KRW minimum
-    uint256 public constant MAX_DEPOSIT_AMOUNT = 10000000 * 1e18; // 10M KRW maximum
-    uint256 public constant YIELD_CALCULATION_INTERVAL = 1 days;
-
+    // Deposit status is now tracked through PropertyNFT's RentalContract.status
+    // No separate mapping needed since PropertyNFT contains all state information
 
     /**
      * @dev Constructor initializes the ERC-4626 vault
      * @param _propertyNFT PropertyNFT contract address
-     * @param _krwToken KRW stablecoin contract address (underlying asset)
-     * @param _initialYieldRate Initial annual yield rate in basis points
+     * @param _krwcToken KRWC stablecoin contract address (underlying asset)
      */
     constructor(
         address _propertyNFT,
-        address _krwToken,
-        uint256 _initialYieldRate
-    ) ERC4626(IERC20(_krwToken)) ERC20("cKRW Deposit Vault", "cKRW") {
+        address _krwcToken
+    ) ERC4626(IERC20(_krwcToken)) ERC20("yKRWC Vault Token", "yKRWC") {
         require(_propertyNFT != address(0), "DepositPool: Invalid PropertyNFT address");
-        require(_krwToken != address(0), "DepositPool: Invalid KRW token address");
-        require(_initialYieldRate <= 10000, "DepositPool: Yield rate too high"); // Max 100%
+        require(_krwcToken != address(0), "DepositPool: Invalid KRWC token address");
 
         propertyNFT = PropertyNFT(_propertyNFT);
-        annualYieldRate = _initialYieldRate;
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(POOL_MANAGER_ROLE, msg.sender);
@@ -62,319 +56,255 @@ contract DepositPool is ERC4626, AccessControl, Pausable, ReentrancyGuard, IDepo
     }
 
     /**
-     * @dev Submit deposit for a verified rental contract
-     * @param propertyTokenId The property token ID
-     * @param krwAmount Amount of KRW to deposit
+     * @dev 전세 계약 실행 시 임차인이 검증된 임차 계약에 대한 보증금을 제출합니다. 
+     * KRWC 형태로 제출되며, 이는 vault에 의해 yKRWC로 변환된 후 임대인에게 전송됩니다.
+     * 해당 nftId의 RentalContract.startDate가 현재 시간 전후 1일 이내에 있으면 호출 가능합니다.
+     * 호출되면 해당 nftId의 RentalContract.status가 ACTIVE 상태로 바뀝니다.
+     * @param nftId The NFT ID associated with the rental contract
+     * @param principal The deposit amount in KRWC
      */
-    function submitDeposit(
-        uint256 propertyTokenId,
-        uint256 krwAmount
+    function submitPrincipal(
+        uint256 nftId,
+        uint256 principal
     ) external nonReentrant whenNotPaused {
-        require(krwAmount >= MIN_DEPOSIT_AMOUNT, "DepositPool: Deposit amount too low");
-        require(krwAmount <= MAX_DEPOSIT_AMOUNT, "DepositPool: Deposit amount too high");
+        require(principal > 0, "DepositPool: Principal must be positive");
+        // Check that no deposit exists by verifying contract is in PENDING status
+        // PENDING means contract exists but deposit hasn't been submitted yet
+
+        // Get rental contract information from PropertyNFT
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        require(rentalContract.status == RentalContractStatus.PENDING, "DepositPool: Contract not pending");
+        require(rentalContract.tenantOrAssignee == msg.sender, "DepositPool: Only contract tenant can submit deposit");
+        require(rentalContract.principal == principal, "DepositPool: Incorrect principal amount");
         
-        // Get property information
-        Property memory property = propertyNFT.getProperty(propertyTokenId);
-        require(property.status == PropertyStatus.CONTRACT_VERIFIED, "DepositPool: Contract not verified");
-        require(property.proposedTenant == msg.sender, "DepositPool: Only proposed tenant can submit deposit");
-        require(property.proposedDepositAmount == krwAmount, "DepositPool: Incorrect deposit amount");
-        require(deposits[propertyTokenId].tenant == address(0), "DepositPool: Deposit already exists");
+        // Check if within valid time range (1 day before/after start date)
+        require(
+            block.timestamp >= rentalContract.startDate - 1 days &&
+            block.timestamp <= rentalContract.startDate + 1 days,
+            "DepositPool: Contract start date not within valid range"
+        );
 
-        // Handle distribution choice
-        uint256 cKRWShares = 0;
-        bool retainInPool = (property.distributionChoice == DistributionChoice.POOL);
+        address landlord = propertyNFT.getProperty(nftId).landlord;
+        
+        // Transfer KRWC from tenant to this contract
+        require(IERC20(asset()).balanceOf(msg.sender) >= principal, "DepositPool: Insufficient KRWC balance");
+        IERC20(asset()).approve(address(this), principal);
+        IERC20(asset()).safeTransferFrom(msg.sender, address(this), principal);
+        
+        // KRWC -> yKRWC
+        uint256 shares = convertToShares(principal);
+        
+        // Mint yKRWC shares to landlord
+        _mint(landlord, shares);
+        
+        // Deposit status is now tracked through PropertyNFT's RentalContract.status
+        // Status will be updated to ACTIVE by activeRentalContractStatus() call below
+        
+        emit DepositSubmitted(nftId, msg.sender, landlord, principal);
+        emit DepositDistributed(nftId, landlord, shares);
+        
+        // Activate rental contract in PropertyNFT
+        try propertyNFT.activeRentalContractStatus(nftId) {
+            // Successfully activated
+        } catch {
+            revert("DepositPool: Failed to activate rental contract");
+        }
+    }
 
-        if (retainInPool) {
-            // POOL choice: Convert KRW to cKRW vault shares for yield generation
-            // Transfer KRW from tenant to vault
-            IERC20(asset()).safeTransferFrom(msg.sender, address(this), krwAmount);
-            
-            // Deposit into vault and mint cKRW shares to this contract
-            cKRWShares = deposit(krwAmount, address(this));
-            
-            emit DepositRetainedInPool(propertyTokenId, cKRWShares, _calculateExpectedYield(krwAmount, property.contractEndTime));
+    /**
+     * @dev 임대인이 보증금을 반환합니다. isKRWC 파라미터에 따라:
+     * - true: 보증금만큼의 KRWC 토큰을 DepositPool에 전송
+     * - false: 전세계약 당시 보증금의 가치에 해당하는 yKRWC 토큰을 DepositPool에 전송
+     * 수량이 부족할 시 revert가 발생합니다.
+     * 호출이 성공하면, 해당 nftId의 RentalContract.status가 COMPLETED 상태로 바뀝니다.
+     * @param nftId The NFT ID
+     * @param isKRWC Whether to return KRWC (true) or yKRWC (false)
+     */
+    function returnPrincipal(
+        uint256 nftId,
+        bool isKRWC
+    ) external nonReentrant whenNotPaused {
+        // Verify there's an active deposit by checking contract status
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        require(rentalContract.status == RentalContractStatus.ACTIVE, "DepositPool: Contract not active");
+        
+        // Verify caller is landlord (NFT owner)
+        address landlord = propertyNFT.getProperty(nftId).landlord;
+        require(msg.sender == landlord, "DepositPool: Only landlord can return principal");
+        
+        uint256 principal = rentalContract.principal;
+        uint256 principalAsShares = convertToShares(principal);
+        
+        if (isKRWC) {
+            // Landlord returns KRWC tokens equal to original deposit amount
+            IERC20(asset()).approve(address(this), principal);
+            IERC20(asset()).safeTransferFrom(msg.sender, address(this), principal);
         } else {
-            // DIRECT choice: Transfer KRW directly to landlord
-            IERC20(asset()).safeTransferFrom(msg.sender, property.landlord, krwAmount);
-            
-            emit DepositDistributed(propertyTokenId, property.landlord, krwAmount, property.distributionChoice);
+            // Landlord returns yKRWC shares equal to original deposit value
+            require(balanceOf(msg.sender) >= principalAsShares, "DepositPool: Insufficient yKRWC balance");
+            IERC20(asset()).approve(address(this), principalAsShares);
+            _transfer(msg.sender, address(this), principalAsShares);
         }
-
-        // Store deposit information
-        deposits[propertyTokenId] = DepositInfo({
-            propertyTokenId: propertyTokenId,
-            tenant: msg.sender,
-            landlord: property.landlord,
-            krwAmount: krwAmount,
-            cKRWShares: cKRWShares,
-            yieldEarned: 0,
-            status: DepositStatus.PENDING,
-            distributionChoice: property.distributionChoice,
-            submissionTime: block.timestamp,
-            expectedReturnTime: property.contractEndTime,
-            isInPool: retainInPool,
-            lastYieldCalculation: block.timestamp
-        });
-
-        // Update tracking
-        tenantDeposits[msg.sender].push(propertyTokenId);
-        landlordDeposits[property.landlord].push(propertyTokenId);
-        totalActiveDeposits++;
-
-        emit DepositSubmitted(propertyTokenId, msg.sender, property.landlord, krwAmount, cKRWShares, property.distributionChoice);
+        propertyNFT.incrementTotalRepaidAmount(nftId, principal);
     }
 
     /**
-     * @dev Activate deposit after admin verification
-     * @param propertyTokenId The property token ID
-     * @param expectedReturnTime Expected contract end time
+     * @dev 정산 완료 후 임차인이 원금 보증금을 회수합니다. 임대인의 DepositPool.returnPrincipal() 호출이 선행되어야 합니다.
+     * @param nftId The NFT ID
      */
-    function activateDeposit(
-        uint256 propertyTokenId,
-        uint256 expectedReturnTime
-    ) external onlyRole(POOL_MANAGER_ROLE) {
-        DepositInfo storage depositInfo = deposits[propertyTokenId];
-        require(depositInfo.tenant != address(0), "DepositPool: Deposit does not exist");
-        require(depositInfo.status == DepositStatus.PENDING, "DepositPool: Deposit not pending");
-        require(expectedReturnTime > block.timestamp, "DepositPool: Invalid return time");
-
-        depositInfo.status = DepositStatus.ACTIVE;
-        depositInfo.expectedReturnTime = expectedReturnTime;
-
-        emit DepositActivated(propertyTokenId, depositInfo.tenant, expectedReturnTime);
-    }
-
-    /**
-     * @dev Calculate and update yield for pool deposits
-     * @param propertyTokenId The property token ID
-     * @return yieldAmount The calculated yield amount
-     */
-    function calculateYield(uint256 propertyTokenId) public returns (uint256 yieldAmount) {
-        DepositInfo storage depositInfo = deposits[propertyTokenId];
-        require(depositInfo.tenant != address(0), "DepositPool: Deposit does not exist");
-        require(depositInfo.isInPool, "DepositPool: Deposit not in yield pool");
-        require(depositInfo.status == DepositStatus.ACTIVE, "DepositPool: Deposit not active");
-
-        uint256 timeElapsed = block.timestamp - depositInfo.lastYieldCalculation;
-        if (timeElapsed < YIELD_CALCULATION_INTERVAL) {
-            return 0;
-        }
-
-        // Calculate yield based on vault appreciation and additional yield rate
-        uint256 vaultYield = _calculateVaultAppreciation(depositInfo.cKRWShares, depositInfo.krwAmount);
-        uint256 additionalYield = _calculateAdditionalYield(depositInfo.krwAmount, timeElapsed);
+    function recoverPrincipal(uint256 nftId) external nonReentrant whenNotPaused {
+        // Verify deposit is not active by checking contract is COMPLETED
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        require(rentalContract.status == RentalContractStatus.ACTIVE, "DepositPool: Contract not completed");        
+        require(rentalContract.tenantOrAssignee == msg.sender, "DepositPool: Only original tenant can recover principal");
         
-        yieldAmount = vaultYield + additionalYield;
-
-        if (yieldAmount > 0) {
-            depositInfo.yieldEarned += yieldAmount;
-            depositInfo.lastYieldCalculation = block.timestamp;
-            totalYieldDistributed += yieldAmount;
-
-            emit YieldCalculated(propertyTokenId, yieldAmount, depositInfo.yieldEarned);
+        uint256 principal = rentalContract.principal;
+        require(principal > 0, "DepositPool: No principal to recover");
+        
+        // Transfer KRWC back to tenant
+        IERC20(asset()).safeTransfer(msg.sender, principal);
+        emit DepositRecovered(nftId, msg.sender, principal);
+        
+        try propertyNFT.completedRentalContractStatus(nftId) {
+            // Successfully completed
+        } catch {
+            revert("DepositPool: Failed to complete rental contract");
         }
-
-        return yieldAmount;
     }
 
     /**
-     * @dev Recover deposit after settlement - tenant gets principal only, yield goes to landlord
-     * @param propertyTokenId The property token ID
+     * @dev 채권양수인이 디폴트된 채권을 구매합니다. nftId가 묶여있는 계약 만기일로부터 유예기간 1일이 지난 이후부터 호출할 수 있으며, 호출되면:
+     * - RentalContract.tenantOrAssignee가 method caller의 주소로 변경
+     * - 구매 비용(principal)이 기존 채권자(임차인)에게 즉시 전송
+     * @param nftId The NFT ID
+     * @param principal The purchase price for the debt
      */
-    function recoverDeposit(uint256 propertyTokenId) external nonReentrant {
-        DepositInfo storage depositInfo = deposits[propertyTokenId];
-        require(depositInfo.tenant == msg.sender, "DepositPool: Only tenant can recover deposit");
-        require(depositInfo.status == DepositStatus.COMPLETED, "DepositPool: Settlement not completed");
+    function purchaseDebt(
+        uint256 nftId,
+        uint256 principal
+    ) external nonReentrant whenNotPaused {
+        // Verify there's an active deposit by checking contract status
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        require(rentalContract.status == RentalContractStatus.OUTSTANDING, "DepositPool: Contract not outstanding");
+        
+        address currentCreditor = rentalContract.tenantOrAssignee;
+        require(msg.sender != currentCreditor, "DepositPool: Cannot purchase from self");
+        
+        // Transfer purchase price to current creditor (tenant or previous assignee)
+        uint256 assigneeKRWCBalance = IERC20(asset()).balanceOf(msg.sender);
+        require(assigneeKRWCBalance >= principal, "DepositPool: Insufficient KRWC balance");
+        IERC20(asset()).approve(address(this), principal);
+        IERC20(asset()).safeTransferFrom(msg.sender, currentCreditor, principal);
+        
+        // Update tenantOrAssignee in PropertyNFT contract
+        try propertyNFT.transferDebt(nftId, msg.sender) {
+            // Successfully updated
+        } catch {
+            revert("DepositPool: Failed to transfer debt claim");
+        }
+        
+        emit DebtTransferred(nftId, currentCreditor, msg.sender, principal);
+    }
 
-        uint256 tenantRecoveryAmount = depositInfo.krwAmount; // Principal only
-        uint256 yieldForLandlord = 0;
+    /**
+    * @dev 현재 채권자(임차인 또는 채권양수인)가 호출하며, 임대인(대출자)이 지금까지 상환한 원리금을 클레임합니다.
+    * @param nftId The NFT ID
+    * @return interestAmount The amount of interest claimed
+    */
+    function collectDebtRepayment(uint256 nftId) external nonReentrant whenNotPaused returns (uint256 interestAmount) {
+        _updateTotalRepaidAmount(nftId);
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        
+        // 권한 검증: 현재 채권자(임차인 또는 채권양수인)만 호출 가능
+        require(msg.sender == rentalContract.tenantOrAssignee, "DepositPool: Only current creditor can collect repayment");
+        require(rentalContract.status == RentalContractStatus.OUTSTANDING, "DepositPool: Contract not outstanding");
 
-        if (depositInfo.isInPool) {
-            // Calculate final yield for landlord
-            yieldForLandlord = calculateYield(propertyTokenId);
-            
-            // Redeem cKRW shares from vault
-            uint256 assetsReceived = redeem(depositInfo.cKRWShares, address(this), address(this));
-            
-            // Total yield includes vault appreciation + additional yield
-            yieldForLandlord = depositInfo.yieldEarned;
-            if (assetsReceived > depositInfo.krwAmount) {
-                yieldForLandlord += (assetsReceived - depositInfo.krwAmount);
+        // 클레임하지 않은 원리금 확인
+        uint256 unclaimedPrincipalAndInterest = _unclaimedPrincipalAndInterest[nftId];
+        require(unclaimedPrincipalAndInterest > 0, "DepositPool: No unclaimed principal and interest");
+        
+        // 풀에 충분한 자금이 있는지 확인
+        require(IERC20(asset()).balanceOf(address(this)) >= unclaimedPrincipalAndInterest, "DepositPool: Insufficient pool balance");
+        
+        // 이자를 채권자에게 전송
+        IERC20(asset()).safeTransfer(msg.sender, unclaimedPrincipalAndInterest);
+        _unclaimedPrincipalAndInterest[nftId] = 0;
+        _lastClaimTime[nftId] = block.timestamp;
+        
+        emit InterestClaimed(nftId, msg.sender, unclaimedPrincipalAndInterest);
+        
+        return unclaimedPrincipalAndInterest;
+    }
+
+    /**
+     * @dev 임대인이 채무를 상환합니다. 호출되면:
+     * - collectDebtRepayment() 호출하여 이자 한번 업데이트
+     * - RentalContract.lastRepaymentTime = 현재 시간으로 업데이트
+     * - RentalContract.totalRepaidAmount += repayAmount (총 상환 금액 누적)
+     * - 만일 RentalContract.totalRepaidAmount + repayAmount >= RentalContract.principal + 총 이자 금액이면, 
+     *   RentalContract.status가 COMPLETED 상태로 바뀌며 대출 계약이 종료됩니다.
+     * @param nftId The NFT ID
+     * @param repayAmount The amount to repay in KRWC
+     */
+    function repayDebt(uint256 nftId, uint256 repayAmount) external nonReentrant whenNotPaused {
+        require(repayAmount > 0, "DepositPool: Repay amount must be positive");
+        
+        _updateTotalRepaidAmount(nftId);
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        
+        // Verify caller is landlord (NFT owner)
+        address landlord = propertyNFT.getProperty(nftId).landlord;
+        require(msg.sender == landlord, "DepositPool: Only landlord can repay debt");
+        require(rentalContract.status == RentalContractStatus.OUTSTANDING, "DepositPool: Contract not outstanding");
+        
+        uint256 remains = rentalContract.totalRepaidAmount - rentalContract.currentRepaidAmount;
+        if (repayAmount > remains) {
+            IERC20(asset()).safeTransferFrom(msg.sender, address(this), remains);
+            _unclaimedPrincipalAndInterest[nftId] += remains;
+            propertyNFT.incrementCurrentRepaidAmount(nftId, remains);
+            try propertyNFT.completedRentalContractStatus(nftId) {
+                emit DebtFullyRepaid(nftId, rentalContract.tenantOrAssignee, remains);
+            } catch {
+                revert("DepositPool: Failed to complete rental contract");
             }
-
-            // Transfer yield to landlord
-            if (yieldForLandlord > 0) {
-                IERC20(asset()).safeTransfer(depositInfo.landlord, yieldForLandlord);
-            }
-        }
-
-        // Transfer principal only to tenant
-        IERC20(asset()).safeTransfer(msg.sender, tenantRecoveryAmount);
-
-        // Update status
-        depositInfo.status = DepositStatus.RECOVERED;
-        totalActiveDeposits--;
-
-        emit DepositRecovered(propertyTokenId, msg.sender, tenantRecoveryAmount, yieldForLandlord);
-    }
-
-    /**
-     * @dev Landlord withdraws yield from active pool deposits
-     * @param propertyTokenId The property token ID
-     * @return yieldAmount Amount of yield withdrawn
-     */
-    function withdrawYield(uint256 propertyTokenId) external nonReentrant returns (uint256 yieldAmount) {
-        DepositInfo storage depositInfo = deposits[propertyTokenId];
-        require(depositInfo.landlord == msg.sender, "DepositPool: Only landlord can withdraw yield");
-        require(depositInfo.isInPool, "DepositPool: Deposit not in yield pool");
-        require(depositInfo.status == DepositStatus.ACTIVE, "DepositPool: Deposit not active");
-
-        // Calculate available yield
-        yieldAmount = calculateYield(propertyTokenId);
-        require(yieldAmount > 0, "DepositPool: No yield available");
-
-        // Transfer yield to landlord
-        IERC20(asset()).safeTransfer(msg.sender, yieldAmount);
-
-        // Reset yield earned as it's been withdrawn
-        depositInfo.yieldEarned = 0;
-
-        return yieldAmount;
-    }
-
-    /**
-     * @dev Handle deposit default and prepare for P2P marketplace
-     * @param propertyTokenId The property token ID
-     */
-    function handleDefault(uint256 propertyTokenId) external onlyRole(POOL_MANAGER_ROLE) {
-        DepositInfo storage depositInfo = deposits[propertyTokenId];
-        require(depositInfo.tenant != address(0), "DepositPool: Deposit does not exist");
-        require(depositInfo.status == DepositStatus.ACTIVE || depositInfo.status == DepositStatus.SETTLEMENT, "DepositPool: Invalid status for default");
-
-        depositInfo.status = DepositStatus.DEFAULTED;
-
-        emit DepositDefaultHandled(propertyTokenId, depositInfo.tenant, depositInfo.krwAmount);
-    }
-
-    /**
-     * @dev Process settlement completion
-     * @param propertyTokenId The property token ID
-     */
-    function processSettlement(uint256 propertyTokenId) external onlyRole(POOL_MANAGER_ROLE) {
-        DepositInfo storage depositInfo = deposits[propertyTokenId];
-        require(depositInfo.tenant != address(0), "DepositPool: Deposit does not exist");
-        require(depositInfo.status == DepositStatus.SETTLEMENT, "DepositPool: Not in settlement");
-
-        depositInfo.status = DepositStatus.COMPLETED;
-        
-        // Calculate final yield for pool deposits
-        if (depositInfo.isInPool) {
-            calculateYield(propertyTokenId);
+        } else {
+            IERC20(asset()).safeTransferFrom(msg.sender, address(this), repayAmount);
+            _unclaimedPrincipalAndInterest[nftId] += repayAmount;
+            propertyNFT.incrementCurrentRepaidAmount(nftId, repayAmount);
+            emit DebtRepaid(nftId, rentalContract.tenantOrAssignee, repayAmount, 0, 0, 0);
         }
     }
 
+    function _updateTotalRepaidAmount(uint256 nftId) internal {
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        uint256 prevLastRepaymentTime = rentalContract.lastRepaymentTime;
+        uint256 prevTotalRepaidAmount = rentalContract.totalRepaidAmount;
+        uint256 prevCurrentRepaidAmount = rentalContract.currentRepaidAmount;
+        uint256 remains = prevTotalRepaidAmount - prevCurrentRepaidAmount;
+
+        uint256 interest = remains * (block.timestamp - prevLastRepaymentTime) * rentalContract.debtInterestRate / 10000 / 31557600;
+
+        propertyNFT.incrementTotalRepaidAmount(nftId, interest);
+        propertyNFT.updateLastRepaymentTime(nftId, block.timestamp);
+    }
+
+
     /**
-     * @dev Update annual yield rate
-     * @param newYieldRate New yield rate in basis points
+     * @dev Override deposit to add pause functionality
      */
-    function updateYieldRate(uint256 newYieldRate) external onlyRole(YIELD_MANAGER_ROLE) {
-        require(newYieldRate <= 10000, "DepositPool: Yield rate too high");
-        
-        uint256 oldRate = annualYieldRate;
-        annualYieldRate = newYieldRate;
-        
-        emit YieldRateUpdated(oldRate, newYieldRate);
+    function deposit(uint256 assets, address receiver) public override nonReentrant whenNotPaused returns (uint256) {
+        return super.deposit(assets, receiver);
     }
 
     /**
-     * @dev Calculate expected yield for a deposit amount over contract period
-     * @param amount Deposit amount
-     * @param contractEndTime Contract end timestamp
-     * @return expectedYield Expected yield amount
+     * @dev Override redeem to add pause functionality
      */
-    function _calculateExpectedYield(uint256 amount, uint256 contractEndTime) internal view returns (uint256 expectedYield) {
-        if (contractEndTime <= block.timestamp) return 0;
-        
-        uint256 timeToMaturity = contractEndTime - block.timestamp;
-        uint256 annualYield = (amount * annualYieldRate) / 10000;
-        expectedYield = (annualYield * timeToMaturity) / 365 days;
-        
-        return expectedYield;
+    function redeem(uint256 shares, address receiver, address owner) public override nonReentrant whenNotPaused returns (uint256) {
+        return super.redeem(shares, receiver, owner);
     }
 
     /**
-     * @dev Calculate vault appreciation for cKRW shares
-     * @param shares Amount of cKRW shares
-     * @param originalAmount Original deposit amount
-     * @return appreciation Vault appreciation amount
-     */
-    function _calculateVaultAppreciation(uint256 shares, uint256 originalAmount) internal view returns (uint256 appreciation) {
-        if (shares == 0) return 0;
-        
-        uint256 currentValue = convertToAssets(shares);
-        if (currentValue > originalAmount) {
-            appreciation = currentValue - originalAmount;
-        }
-        
-        return appreciation;
-    }
-
-    /**
-     * @dev Calculate additional yield based on time elapsed
-     * @param amount Deposit amount
-     * @param timeElapsed Time elapsed since last calculation
-     * @return additionalYield Additional yield amount
-     */
-    function _calculateAdditionalYield(uint256 amount, uint256 timeElapsed) internal view returns (uint256 additionalYield) {
-        uint256 annualYield = (amount * annualYieldRate) / 10000;
-        additionalYield = (annualYield * timeElapsed) / 365 days;
-        
-        return additionalYield;
-    }
-
-    /**
-     * @dev Get deposit information
-     * @param propertyTokenId The property token ID
-     * @return DepositInfo struct
-     */
-    function getDeposit(uint256 propertyTokenId) external view returns (DepositInfo memory) {
-        return deposits[propertyTokenId];
-    }
-
-    /**
-     * @dev Get tenant deposits
-     * @param tenant Tenant address
-     * @return Array of property token IDs
-     */
-    function getTenantDeposits(address tenant) external view returns (uint256[] memory) {
-        return tenantDeposits[tenant];
-    }
-
-    /**
-     * @dev Get landlord deposits
-     * @param landlord Landlord address
-     * @return Array of property token IDs
-     */
-    function getLandlordDeposits(address landlord) external view returns (uint256[] memory) {
-        return landlordDeposits[landlord];
-    }
-
-    /**
-     * @dev Get total vault statistics
-     * @return vaultAssets Total assets in vault
-     * @return vaultShares Total shares outstanding
-     * @return sharePrice Current share price
-     */
-    function getVaultStats() external view returns (uint256 vaultAssets, uint256 vaultShares, uint256 sharePrice) {
-        vaultAssets = totalAssets();
-        vaultShares = totalSupply();
-        sharePrice = vaultShares > 0 ? (vaultAssets * 1e18) / vaultShares : 1e18;
-        
-        return (vaultAssets, vaultShares, sharePrice);
-    }
-
-    /**
-     * @dev Override to add pause functionality
+     * @dev Override _update to add pause functionality
      */
     function _update(address from, address to, uint256 value) internal override whenNotPaused {
         super._update(from, to, value);
