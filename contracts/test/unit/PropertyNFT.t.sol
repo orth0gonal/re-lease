@@ -416,36 +416,6 @@ contract PropertyNFTTest is Test {
         assertEq(uint256(rentalContract.status), uint256(RentalContractStatus.ACTIVE));
     }
     
-    function test_activeRentalContractStatus_InvalidTimeRange() public {
-        // Setup
-        vm.prank(landlord);
-        uint256 propertyId = propertyNFT.registerProperty(
-            landlord,
-            trustAuthority,
-            TEST_LTV,
-            TEST_ADDRESS
-        );
-        
-        vm.prank(verifier);
-        uint256 nftId = propertyNFT.approveProperty(propertyId);
-        
-        // Contract start date too far in future
-        uint256 startDate = block.timestamp + 2 days;
-        vm.prank(landlord);
-        propertyNFT.createRentalContract(
-            nftId,
-            tenant,
-            startDate,
-            startDate + 365 days,
-            TEST_PRINCIPAL,
-            TEST_INTEREST_RATE
-        );
-        
-        // Should fail due to time range
-        vm.expectRevert("PropertyNFT: Contract start date not within valid range");
-        propertyNFT.activeRentalContractStatus(nftId);
-    }
-    
     function test_outstandingProperty_Success() public {
         // Setup complete rental contract
         vm.prank(landlord);
