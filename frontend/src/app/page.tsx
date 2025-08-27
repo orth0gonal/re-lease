@@ -1,23 +1,17 @@
 'use client'
 
-import { WalletConnectButton } from '@/components/wallet/wallet-connect-button'
-import { ThemeToggle } from '@/components/theme-toggle'
-import { Logo } from '@/components/ui/logo'
+import { Navbar } from '@/components/ui/navbar'
+import { Footer } from '@/components/ui/footer'
 import { RoleCard } from '@/components/ui/role-card'
 import { Home as HomeIcon, User as UserIcon, TrendingUp as TrendingUpIcon } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 export default function Home() {
+  const router = useRouter()
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted flex flex-col">
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Logo />
-          <div className="flex items-center space-x-4">
-            <ThemeToggle />
-            <WalletConnectButton />
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       <main className="container mx-auto px-4 py-12 flex-grow">
         <div className="text-center space-y-6 mb-16">
@@ -37,10 +31,7 @@ export default function Home() {
               description="Deposit KRWC for guaranteed protection. Become creditor with automatic recovery system."
               icon={UserIcon}
               color="green"
-              onClick={() => {
-                // TODO: Navigate to tenant dashboard
-                console.log('Tenant selected')
-              }}
+              onClick={() => router.push('/tenant')}
             />
             
             <RoleCard
@@ -48,10 +39,7 @@ export default function Home() {
               description="Receive yKRWC tokens earning 3-5% yield. Hold for returns or sell for liquidity."
               icon={HomeIcon}
               color="blue"
-              onClick={() => {
-                // TODO: Navigate to landlord dashboard
-                console.log('Landlord selected')
-              }}
+              onClick={() => router.push('/landlord')}
             />
             
             <RoleCard
@@ -59,28 +47,14 @@ export default function Home() {
               description="Purchase defaulted debt with real estate collateral and priority recovery rights."
               icon={TrendingUpIcon}
               color="purple"
-              onClick={() => {
-                // TODO: Navigate to assignee marketplace
-                console.log('Assignee selected')
-              }}
+              onClick={() => router.push('/assignee')}
             />
           </div>
         </div>
 
       </main>
 
-      <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 mt-auto">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <span className="text-sm text-muted-foreground">
-              Powered by re:Lease
-            </span>
-            <p className="text-sm text-muted-foreground">
-              © 2025 re:Lease. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }

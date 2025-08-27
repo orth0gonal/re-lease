@@ -44,7 +44,7 @@ export function RoleCard({
   return (
     <Card 
       className={cn(
-        'relative h-full transition-all duration-300 cursor-pointer group select-none',
+        'relative h-full w-full max-w-sm mx-auto transition-all duration-300 cursor-pointer group select-none',
         'min-h-[240px] p-4 sm:p-6 border-2',
         'hover:shadow-xl hover:-translate-y-2 active:translate-y-0 active:shadow-lg',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
