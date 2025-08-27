@@ -21,14 +21,14 @@ contract KRWToken is ERC20, AccessControl, Pausable, ERC20Burnable, IKRWTokenEve
 
     // Token metadata
     uint8 private constant DECIMALS = 18;
-    uint256 public constant MAX_SUPPLY = 1_000_000_000 * 10**DECIMALS; // 1 billion KRW max supply
+    uint256 public constant MAX_SUPPLY = 100_000_000_000 * 10**DECIMALS; // 100 billion KRW max supply
 
 
     /**
      * @dev Constructor initializes the KRW token
      * @param initialSupply Initial supply to mint to deployer
      */
-    constructor(uint256 initialSupply) ERC20("Korean Won Token", "KRW") {
+    constructor(uint256 initialSupply) ERC20("Korean Won Token", "KRWC") {
         require(initialSupply <= MAX_SUPPLY, "KRWToken: Initial supply exceeds max supply");
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -51,12 +51,14 @@ contract KRWToken is ERC20, AccessControl, Pausable, ERC20Burnable, IKRWTokenEve
 
     /**
      * @dev Mint tokens to specified address
+     * @notice mint function is OPEN TO PUBLIC for testing purposes
      * @param to Address to mint tokens to
      * @param amount Amount of tokens to mint
      */
-    function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) whenNotPaused {
+    function mint(address to, uint256 amount) external whenNotPaused {
         require(to != address(0), "KRWToken: Cannot mint to zero address");
         require(amount > 0, "KRWToken: Cannot mint zero tokens");
+        require(amount <= 100_000_000 * 10**DECIMALS, "KRWToken: Cannot mint more than 100M tokens");
         require(totalSupply() + amount <= MAX_SUPPLY, "KRWToken: Minting would exceed max supply");
 
         _mint(to, amount);
