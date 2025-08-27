@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "re:Lease, stablecoin-powered jeonse platform",
+  title: "re:Lease | Stablecoin-powered Jeonse Platform with Auto-Debt Conversion",
   description: "Stablecoin-powered Jeonse Platform with Auto-Debt Conversion on Kaia blockchain",
   icons: {
     icon: '/logo-release-icon.png',
