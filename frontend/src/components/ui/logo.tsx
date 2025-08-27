@@ -1,5 +1,6 @@
 import React from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 
 interface LogoProps {
   className?: string
@@ -14,7 +15,7 @@ export function Logo({ className = '', size = 'md' }: LogoProps) {
   }
 
   return (
-    <>
+    <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
       <Image
         src="/logo-release-black-transparent.png"
         alt="re:Lease"
@@ -33,7 +34,7 @@ export function Logo({ className = '', size = 'md' }: LogoProps) {
         className={`${sizeClasses[size]} w-auto hidden dark:block ${className}`}
         priority
       />
-    </>
+    </Link>
   )
 }
 

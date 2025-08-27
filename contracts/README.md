@@ -1,5 +1,20 @@
 ## Re-lease Smart Contract
 
+<div align="center">
+
+### 🔗 Kaia Testnet Deployed Contracts
+
+| Contract | Address | KaiaScan |
+|----------|---------|----------|
+| **KRWToken** | `0x7d514aB4EE81ed4b3759A1624245f34EBdb315fc` | [![KaiaScan](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://kairos.kaiascan.io/ko/address/0x7d514ab4ee81ed4b3759a1624245f34ebdb315fc?tabId=txList&page=1) |
+| **PropertyNFT** | `0x2D97D074FEF385b9b3f44064A7dd1349Cb9fdBdF` | [![KaiaScan](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://kairos.kaiascan.io/ko/address/0x2D97D074FEF385b9b3f44064A7dd1349Cb9fdBdF?tabId=txList&page=1) |
+| **DepositPool** | `0xa0c0FBdAb220cDe50e9606B8Cf02D0119793D023` | [![KaiaScan](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://kairos.kaiascan.io/ko/address/0xa0c0FBdAb220cDe50e9606B8Cf02D0119793D023?tabId=txList&page=1) |
+
+**Network**: Kaia Testnet (Chain ID: 1001)  
+**Deployer**: `0x541070bECf02bdE10Fbd347bb7EedC8033609A48`
+
+</div>
+
 Re-lease smart contract에 대한 자세한 문서는 [docs.md](docs.md)를 참고
 
 ## Usage
