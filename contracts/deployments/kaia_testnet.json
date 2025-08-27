@@ -1,0 +1,16 @@
+{
+  "network": "kaia_testnet",
+  "chainId": 1001,
+  "deployedAt": "1756299437",
+  "deployer": "0x541070bECf02bdE10Fbd347bb7EedC8033609A48",
+  "contracts": {
+    "KRWToken": "0xfDb2145CEd8006f1311b0dE6FDeF89f3479DD6E1",
+    "PropertyNFT": "0x2b2f54b9178F5Fe084055184bB0FCEe828d9fC7B",
+    "DepositPool": "0xD0e632DA0D3ffC36505a23F3294925be3fDc6436"
+  },
+  "configuration": {
+    "krwTokenSupply": "100000000000000000000000000",
+    "vaultTokenSymbol": "yKRWC",
+    "vaultTokenName": "yKRWC Vault Token"
+  }
+}

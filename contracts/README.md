@@ -21,46 +21,14 @@ https://book.getfoundry.sh/
 $ forge build
 ```
 
+### Deploy
+
+```shell
+$ forge script script/Deploy.s.sol:Deploy --broadcast --legacy --slow --rpc-url kaia_testnet --private-key $DEPLOYER_PRIVATE_KEY -vvv
+```
+
 ### Test
 
 ```shell
 $ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
 ```
