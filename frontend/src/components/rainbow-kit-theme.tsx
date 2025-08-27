@@ -22,8 +22,8 @@ export function RainbowKitThemeProvider({ children }: RainbowKitThemeProviderPro
     return (
       <RainbowKitProvider
         theme={lightTheme({
-          accentColor: '#00D9FF',
-          accentColorForeground: 'white',
+          accentColor: '#BFF009',
+          accentColorForeground: 'black',
           borderRadius: 'medium',
           fontStack: 'system',
           overlayBlur: 'small',
@@ -38,14 +38,14 @@ export function RainbowKitThemeProvider({ children }: RainbowKitThemeProviderPro
   return (
     <RainbowKitProvider
       theme={theme === 'dark' ? darkTheme({
-        accentColor: '#00D9FF',
-        accentColorForeground: 'white',
+        accentColor: '#BFF009',
+        accentColorForeground: 'black',
         borderRadius: 'medium',
         fontStack: 'system',
         overlayBlur: 'small',
       }) : lightTheme({
-        accentColor: '#00D9FF',
-        accentColorForeground: 'white',
+        accentColor: '#BFF009',
+        accentColorForeground: 'black',
         borderRadius: 'medium',
         fontStack: 'system',
         overlayBlur: 'small',

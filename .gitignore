@@ -63,3 +63,4 @@ temp/
 .taskmaster/
 tasks.md
 task_breakdown.md 
+.vercel

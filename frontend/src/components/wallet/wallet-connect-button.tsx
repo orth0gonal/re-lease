@@ -62,50 +62,60 @@ export function WalletConnectButton() {
               }
 
               return (
-                <div className="flex gap-2">
-                  <Button
-                    onClick={openChainModal}
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    {chain.hasIcon && (
-                      <div
-                        style={{
-                          background: chain.iconBackground,
-                          width: 16,
-                          height: 16,
-                          borderRadius: 999,
-                          overflow: 'hidden',
-                          marginRight: 4,
-                        }}
-                      >
-                        {chain.iconUrl && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            alt={chain.name ?? 'Chain icon'}
-                            src={chain.iconUrl}
-                            style={{ width: 16, height: 16 }}
-                          />
-                        )}
-                      </div>
-                    )}
-                    {chain.name}
-                    <ChevronDown className="w-3 h-3" />
-                  </Button>
+                <div className="flex items-center gap-3">
+                  {account.displayBalance && (
+                    <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
+                      <Wallet className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">
+                        {account.displayBalance}
+                      </span>
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={openChainModal}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      {chain.hasIcon && (
+                        <div
+                          style={{
+                            background: chain.iconBackground,
+                            width: 16,
+                            height: 16,
+                            borderRadius: 999,
+                            overflow: 'hidden',
+                            marginRight: 4,
+                          }}
+                        >
+                          {chain.iconUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              alt={chain.name ?? 'Chain icon'}
+                              src={chain.iconUrl}
+                              style={{ width: 16, height: 16 }}
+                            />
+                          )}
+                        </div>
+                      )}
+                      <span className="hidden sm:inline">{chain.name}</span>
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
 
-                  <Button
-                    onClick={openAccountModal}
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    {account.displayName}
-                    {account.displayBalance
-                      ? ` (${account.displayBalance})`
-                      : ''}
-                    <ChevronDown className="w-3 h-3" />
-                  </Button>
+                    <Button
+                      onClick={openAccountModal}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <span className="font-mono text-xs">
+                        {account.displayName}
+                      </span>
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
+                  </div>
                 </div>
               )
             })()}
