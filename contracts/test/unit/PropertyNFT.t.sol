@@ -6,464 +6,828 @@ import "forge-std/console.sol";
 import "../../src/PropertyNFT.sol";
 import "../../src/interfaces/Structs.sol";
 
-contract PropertyNFTUnitTest is Test {
+/**
+ * @title PropertyNFTTest
+ * @dev Comprehensive unit tests for PropertyNFT contract
+ */
+contract PropertyNFTTest is Test {
     PropertyNFT public propertyNFT;
     
-    // Test accounts with specific roles
-    address public admin = makeAddr("admin");
-    address public verifier = makeAddr("verifier");
-    address public landlord1 = makeAddr("landlord1");
-    address public landlord2 = makeAddr("landlord2");
-    address public tenant1 = makeAddr("tenant1");
-    address public tenant2 = makeAddr("tenant2");
-    address public unauthorized = makeAddr("unauthorized");
+    // Test accounts
+    address public admin = address(0x1);
+    address public verifier = address(0x2);
+    address public landlord = address(0x3);
+    address public tenant = address(0x4);
+    address public trustAuthority = address(0x5);
+    address public assignee = address(0x6);
     
     // Test data
-    uint256 public constant TEST_DEPOSIT_AMOUNT = 100_000_000 * 1e18; // 100M KRW
-    uint256 public constant TEST_LTV = 7000; // 70%
-    bytes32 public constant TEST_ADDRESS = keccak256("Seoul, Gangnam-gu");
-    bytes32 public constant TEST_DESCRIPTION = keccak256("3-bedroom apartment");
+    uint256 public constant TEST_LTV = 8000; // 80%
+    bytes32 public constant TEST_ADDRESS = keccak256("123 Test Street, Seoul");
+    uint256 public constant TEST_PRINCIPAL = 100_000_000; // 100M KRWC
+    uint256 public constant TEST_INTEREST_RATE = 500; // 5%
+    
+    // Events to test
+    event PropertyProposed(uint256 indexed propertyId, address indexed landlord, uint256 ltv, bytes32 registrationAddress);
+    event PropertyApproved(uint256 indexed propertyId, address indexed verifier);
+    event PropertyRejected(uint256 indexed propertyId, address indexed verifier, string reason);
+    event PropertyStatusUpdated(uint256 indexed propertyId, PropertyStatus oldStatus, PropertyStatus newStatus);
+    event RentalContractCreated(uint256 indexed nftId, address indexed tenant, uint256 principal, uint256 startDate, uint256 endDate, uint256 debtInterestRate);
+    event DebtPropertyListed(uint256 indexed nftId, uint256 principal, uint256 debtInterestRate);
+    event DebtFullyRepaid(uint256 indexed nftId, address indexed creditor, uint256 finalAmount);
     
     function setUp() public {
         vm.startPrank(admin);
+        
+        // Deploy PropertyNFT
         propertyNFT = new PropertyNFT();
         
         // Grant verifier role
         propertyNFT.grantRole(propertyNFT.PROPERTY_VERIFIER_ROLE(), verifier);
+        
         vm.stopPrank();
     }
     
     // ═══════════════════════════════════════════════════════════════════
-    // Property Proposal Tests
+    // Property Registration Tests
     // ═══════════════════════════════════════════════════════════════════
     
-    function testProposeProperty() public {
-        // CALLER: landlord1 (property owner)
-        vm.startPrank(landlord1);
+    function test_registerProperty_Success() public {
+        vm.prank(landlord);
         
-        uint256 proposalId = propertyNFT.proposeProperty(
-            DistributionChoice.POOL,
-            TEST_DEPOSIT_AMOUNT,
-            true,  // landOwnershipAuthority
-            false, // landTrustAuthority
+        vm.expectEmit(true, true, false, true);
+        emit PropertyProposed(1, landlord, TEST_LTV, TEST_ADDRESS);
+        
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
             TEST_LTV,
-            TEST_ADDRESS,
-            TEST_DESCRIPTION
+            TEST_ADDRESS
         );
         
-        vm.stopPrank();
+        assertEq(propertyId, 1);
         
-        // Verify proposal was created
-        PropertyProposal memory proposal = propertyNFT.getPropertyProposal(proposalId);
-        assertEq(proposal.landlord, landlord1);
-        assertEq(uint(proposal.distributionChoice), uint(DistributionChoice.POOL));
-        assertEq(proposal.depositAmount, TEST_DEPOSIT_AMOUNT);
-        assertTrue(proposal.landOwnershipAuthority);
-        assertFalse(proposal.landTrustAuthority);
-        assertEq(proposal.ltv, TEST_LTV);
-        assertEq(proposal.registrationAddress, TEST_ADDRESS);
-        assertEq(proposal.propertyDescription, TEST_DESCRIPTION);
-        assertFalse(proposal.isProcessed);
-        
-        // Verify deadline is set correctly (14 days from now)
-        assertEq(proposal.verificationDeadline, block.timestamp + 14 days);
+        Property memory prop = propertyNFT.getProperty(propertyId);
+        assertEq(prop.landlord, landlord);
+        assertEq(uint256(prop.status), uint256(PropertyStatus.PENDING));
+        assertEq(prop.trustAuthority, trustAuthority);
+        assertEq(prop.registrationAddress, TEST_ADDRESS);
+        assertEq(prop.ltv, TEST_LTV);
     }
     
-    function testProposePropertyInvalidParams() public {
-        // CALLER: landlord1 (property owner)
-        vm.startPrank(landlord1);
+    function test_registerProperty_InvalidLandlord() public {
+        vm.prank(landlord);
         
-        // Test invalid deposit amount (too low)
-        vm.expectRevert("PropertyNFT: Invalid deposit amount");
-        propertyNFT.proposeProperty(
-            DistributionChoice.POOL,
-            1000 * 1e18, // Below minimum
-            true, false, TEST_LTV, TEST_ADDRESS, TEST_DESCRIPTION
+        vm.expectRevert("PropertyNFT: Invalid landlord address");
+        propertyNFT.registerProperty(
+            address(0),
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
         );
-        
-        // Test invalid LTV (too high)
-        vm.expectRevert("PropertyNFT: Invalid LTV ratio");
-        propertyNFT.proposeProperty(
-            DistributionChoice.POOL,
-            TEST_DEPOSIT_AMOUNT,
-            true, false, 10001, // Above 100%
-            TEST_ADDRESS, TEST_DESCRIPTION
-        );
-        
-        vm.stopPrank();
     }
     
-    function testApprovePropertyProposal() public {
-        // CALLER: landlord1 creates proposal
-        vm.prank(landlord1);
-        uint256 proposalId = propertyNFT.proposeProperty(
-            DistributionChoice.DIRECT,
-            TEST_DEPOSIT_AMOUNT,
-            true, true, TEST_LTV, TEST_ADDRESS, TEST_DESCRIPTION
+    function test_registerProperty_EmptyAddress() public {
+        vm.prank(landlord);
+        
+        vm.expectRevert("PropertyNFT: Registration address cannot be empty");
+        propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            bytes32(0)
         );
-        
-        // CALLER: verifier (has PROPERTY_VERIFIER_ROLE)
-        vm.startPrank(verifier);
-        uint256 tokenId = propertyNFT.approvePropertyProposal(proposalId);
-        vm.stopPrank();
-        
-        // Verify NFT was minted
-        assertEq(propertyNFT.ownerOf(tokenId), landlord1);
-        
-        // Verify property data
-        Property memory property = propertyNFT.getProperty(tokenId);
-        assertEq(property.landlord, landlord1);
-        assertEq(uint(property.status), uint(PropertyStatus.PENDING));
-        assertEq(uint(property.distributionChoice), uint(DistributionChoice.DIRECT));
-        assertEq(property.depositAmount, TEST_DEPOSIT_AMOUNT);
-        assertEq(property.proposalId, proposalId);
-        
-        // Verify proposal is marked as processed
-        PropertyProposal memory proposal = propertyNFT.getPropertyProposal(proposalId);
-        assertTrue(proposal.isProcessed);
     }
     
-    function testApprovePropertyProposalUnauthorized() public {
-        // CALLER: landlord1 creates proposal
-        vm.prank(landlord1);
-        uint256 proposalId = propertyNFT.proposeProperty(
-            DistributionChoice.DIRECT,
-            TEST_DEPOSIT_AMOUNT,
-            true, true, TEST_LTV, TEST_ADDRESS, TEST_DESCRIPTION
-        );
+    function test_registerProperty_ExcessiveLTV() public {
+        vm.prank(landlord);
         
-        // CALLER: unauthorized user (no PROPERTY_VERIFIER_ROLE)
-        vm.startPrank(unauthorized);
-        bytes32 requiredRole = propertyNFT.PROPERTY_VERIFIER_ROLE();
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                unauthorized,
-                requiredRole
-            )
+        vm.expectRevert("PropertyNFT: LTV cannot exceed 100% (10000 basis points)");
+        propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            10001, // > 100%
+            TEST_ADDRESS
         );
-        propertyNFT.approvePropertyProposal(proposalId);
-        vm.stopPrank();
-    }
-    
-    function testRejectPropertyProposal() public {
-        // CALLER: landlord1 creates proposal
-        vm.prank(landlord1);
-        uint256 proposalId = propertyNFT.proposeProperty(
-            DistributionChoice.POOL,
-            TEST_DEPOSIT_AMOUNT,
-            true, false, TEST_LTV, TEST_ADDRESS, TEST_DESCRIPTION
-        );
-        
-        // CALLER: verifier (has PROPERTY_VERIFIER_ROLE)
-        vm.startPrank(verifier);
-        string memory reason = "Insufficient documentation";
-        propertyNFT.rejectPropertyProposal(proposalId, reason);
-        vm.stopPrank();
-        
-        // Verify proposal is marked as processed
-        PropertyProposal memory proposal = propertyNFT.getPropertyProposal(proposalId);
-        assertTrue(proposal.isProcessed);
     }
     
     // ═══════════════════════════════════════════════════════════════════
-    // Property Verification Tests  
+    // Property Approval/Rejection Tests
     // ═══════════════════════════════════════════════════════════════════
     
-    function testVerifyProperty() public {
-        // Setup: Create and approve a proposal
-        vm.prank(landlord1);
-        uint256 proposalId = propertyNFT.proposeProperty(
-            DistributionChoice.POOL,
-            TEST_DEPOSIT_AMOUNT,
-            true, true, TEST_LTV, TEST_ADDRESS, TEST_DESCRIPTION
+    function test_approveProperty_Success() public {
+        // First register property
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
         );
         
+        // Then approve it
         vm.prank(verifier);
-        uint256 tokenId = propertyNFT.approvePropertyProposal(proposalId);
         
-        // CALLER: verifier (has PROPERTY_VERIFIER_ROLE)
-        vm.startPrank(verifier);
-        propertyNFT.verifyProperty(tokenId);
-        vm.stopPrank();
+        vm.expectEmit(true, true, false, true);
+        emit PropertyApproved(propertyId, verifier);
         
-        // Verify property status changed to ACTIVE
-        Property memory property = propertyNFT.getProperty(tokenId);
-        assertEq(uint(property.status), uint(PropertyStatus.ACTIVE));
-        assertTrue(property.isVerified);
+        vm.expectEmit(true, false, false, true);
+        emit PropertyStatusUpdated(propertyId, PropertyStatus.PENDING, PropertyStatus.REGISTERED);
+        
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
+        
+        assertEq(nftId, 1);
+        assertEq(propertyNFT.ownerOf(nftId), landlord);
+        
+        Property memory prop = propertyNFT.getProperty(propertyId);
+        assertEq(uint256(prop.status), uint256(PropertyStatus.REGISTERED));
     }
     
-    function testVerifyPropertyUnauthorized() public {
-        // Setup: Create and approve a proposal
-        vm.prank(landlord1);
-        uint256 proposalId = propertyNFT.proposeProperty(
-            DistributionChoice.POOL,
-            TEST_DEPOSIT_AMOUNT,
-            true, true, TEST_LTV, TEST_ADDRESS, TEST_DESCRIPTION
+    function test_approveProperty_NonExistentProperty() public {
+        vm.prank(verifier);
+        
+        vm.expectRevert("PropertyNFT: Property does not exist");
+        propertyNFT.approveProperty(999);
+    }
+    
+    function test_approveProperty_NotPending() public {
+        // Register and approve property
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
         );
         
         vm.prank(verifier);
-        uint256 tokenId = propertyNFT.approvePropertyProposal(proposalId);
+        propertyNFT.approveProperty(propertyId);
         
-        // CALLER: unauthorized user (no PROPERTY_VERIFIER_ROLE)
-        vm.startPrank(unauthorized);
-        bytes32 requiredRole = propertyNFT.PROPERTY_VERIFIER_ROLE();
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                unauthorized,
-                requiredRole
-            )
+        // Try to approve again
+        vm.prank(verifier);
+        vm.expectRevert("PropertyNFT: Property not in pending status");
+        propertyNFT.approveProperty(propertyId);
+    }
+    
+    function test_approveProperty_OnlyVerifier() public {
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
         );
-        propertyNFT.verifyProperty(tokenId);
-        vm.stopPrank();
+        
+        vm.prank(landlord); // Not verifier
+        vm.expectRevert();
+        propertyNFT.approveProperty(propertyId);
+    }
+    
+    function test_rejectProperty_Success() public {
+        // Register property
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
+        );
+        
+        // Reject it
+        vm.prank(verifier);
+        
+        vm.expectEmit(true, true, false, true);
+        emit PropertyRejected(propertyId, verifier, "Property rejected by verifier");
+        
+        vm.expectEmit(true, false, false, true);
+        emit PropertyStatusUpdated(propertyId, PropertyStatus.PENDING, PropertyStatus.SUSPENDED);
+        
+        propertyNFT.rejectProperty(propertyId);
+        
+        Property memory prop = propertyNFT.getProperty(propertyId);
+        assertEq(uint256(prop.status), uint256(PropertyStatus.SUSPENDED));
     }
     
     // ═══════════════════════════════════════════════════════════════════
     // Rental Contract Tests
     // ═══════════════════════════════════════════════════════════════════
     
-    function testCreateRentalContract() public {
-        // Setup: Create, approve and verify a property
-        vm.prank(landlord1);
-        uint256 proposalId = propertyNFT.proposeProperty(
-            DistributionChoice.DIRECT,
-            TEST_DEPOSIT_AMOUNT,
-            true, false, TEST_LTV, TEST_ADDRESS, TEST_DESCRIPTION
+    function test_createRentalContract_Success() public {
+        // Setup: Register and approve property
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
         );
         
-        vm.startPrank(verifier);
-        uint256 tokenId = propertyNFT.approvePropertyProposal(proposalId);
-        propertyNFT.verifyProperty(tokenId);
-        vm.stopPrank();
+        vm.prank(verifier);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
         
-        // CALLER: landlord1 (property owner)
-        vm.startPrank(landlord1);
-        uint256 startTime = block.timestamp + 1 days;
-        uint256 endTime = startTime + 365 days; // 1 year contract
-        uint256 proposedDeposit = TEST_DEPOSIT_AMOUNT + 10_000_000 * 1e18; // Higher deposit
+        // Create rental contract
+        uint256 startDate = block.timestamp + 1 days;
+        uint256 endDate = startDate + 365 days;
+        
+        vm.prank(landlord);
+        
+        vm.expectEmit(true, true, false, true);
+        emit RentalContractCreated(nftId, tenant, TEST_PRINCIPAL, startDate, endDate, TEST_INTEREST_RATE);
         
         propertyNFT.createRentalContract(
-            tokenId,
-            tenant1,
-            startTime,
-            endTime,
-            proposedDeposit
+            nftId,
+            tenant,
+            startDate,
+            endDate,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
         );
-        vm.stopPrank();
         
-        // Verify contract data
-        Property memory property = propertyNFT.getProperty(tokenId);
-        assertEq(uint(property.status), uint(PropertyStatus.CONTRACT_PENDING));
-        assertEq(property.proposedTenant, tenant1);
-        assertEq(property.contractStartTime, startTime);
-        assertEq(property.contractEndTime, endTime);
-        assertEq(property.proposedDepositAmount, proposedDeposit);
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        assertEq(rentalContract.nftId, nftId);
+        assertEq(rentalContract.tenantOrAssignee, tenant);
+        assertEq(rentalContract.principal, TEST_PRINCIPAL);
+        assertEq(rentalContract.startDate, startDate);
+        assertEq(rentalContract.endDate, endDate);
+        assertEq(uint256(rentalContract.status), uint256(RentalContractStatus.PENDING));
+        assertEq(rentalContract.debtInterestRate, TEST_INTEREST_RATE);
+        assertEq(rentalContract.totalRepaidAmount, TEST_PRINCIPAL);
+        assertEq(rentalContract.currentRepaidAmount, 0);
+        assertEq(rentalContract.lastRepaymentTime, 0);
     }
     
-    function testCreateRentalContractUnauthorized() public {
-        // Setup: Create, approve and verify a property
-        vm.prank(landlord1);
-        uint256 proposalId = propertyNFT.proposeProperty(
-            DistributionChoice.DIRECT,
-            TEST_DEPOSIT_AMOUNT,
-            true, false, TEST_LTV, TEST_ADDRESS, TEST_DESCRIPTION
+    function test_createRentalContract_OnlyNFTOwner() public {
+        // Setup
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
         );
         
-        vm.startPrank(verifier);
-        uint256 tokenId = propertyNFT.approvePropertyProposal(proposalId);
-        propertyNFT.verifyProperty(tokenId);
-        vm.stopPrank();
+        vm.prank(verifier);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
         
-        // CALLER: unauthorized user (not property owner)
-        vm.startPrank(unauthorized);
-        uint256 startTime = block.timestamp + 1 days;
-        uint256 endTime = startTime + 365 days;
-        
-        vm.expectRevert("PropertyNFT: Only landlord can create contract");
+        // Try to create contract as non-owner
+        vm.prank(tenant);
+        vm.expectRevert("PropertyNFT: Only NFT owner can create rental contract");
         propertyNFT.createRentalContract(
-            tokenId,
-            tenant1,
-            startTime,
-            endTime,
-            TEST_DEPOSIT_AMOUNT
-        );
-        vm.stopPrank();
-    }
-    
-    function testVerifyRentalContract() public {
-        // Setup: Create property and rental contract
-        vm.prank(landlord1);
-        uint256 proposalId = propertyNFT.proposeProperty(
-            DistributionChoice.POOL,
-            TEST_DEPOSIT_AMOUNT,
-            true, true, TEST_LTV, TEST_ADDRESS, TEST_DESCRIPTION
-        );
-        
-        vm.startPrank(verifier);
-        uint256 tokenId = propertyNFT.approvePropertyProposal(proposalId);
-        propertyNFT.verifyProperty(tokenId);
-        vm.stopPrank();
-        
-        vm.prank(landlord1);
-        propertyNFT.createRentalContract(
-            tokenId,
-            tenant1,
+            nftId,
+            tenant,
             block.timestamp + 1 days,
             block.timestamp + 366 days,
-            TEST_DEPOSIT_AMOUNT
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
         );
-        
-        // CALLER: verifier (has PROPERTY_VERIFIER_ROLE)
-        vm.startPrank(verifier);
-        propertyNFT.verifyRentalContract(tokenId);
-        vm.stopPrank();
-        
-        // Verify contract status changed
-        Property memory property = propertyNFT.getProperty(tokenId);
-        assertEq(uint(property.status), uint(PropertyStatus.CONTRACT_VERIFIED));
     }
     
-    // ═══════════════════════════════════════════════════════════════════
-    // Property Status Management Tests
-    // ═══════════════════════════════════════════════════════════════════
-    
-    function testUpdatePropertyStatus() public {
-        // Setup: Create property
-        vm.prank(landlord1);
-        uint256 proposalId = propertyNFT.proposeProperty(
-            DistributionChoice.DIRECT,
-            TEST_DEPOSIT_AMOUNT,
-            true, false, TEST_LTV, TEST_ADDRESS, TEST_DESCRIPTION
+    function test_createRentalContract_InvalidParameters() public {
+        // Setup
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
         );
         
         vm.prank(verifier);
-        uint256 tokenId = propertyNFT.approvePropertyProposal(proposalId);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
         
-        // CALLER: verifier (has PROPERTY_VERIFIER_ROLE) - verify the property
-        vm.startPrank(verifier);
-        propertyNFT.verifyProperty(tokenId);
+        vm.startPrank(landlord);
+        
+        // Invalid tenant
+        vm.expectRevert("PropertyNFT: Invalid tenant address");
+        propertyNFT.createRentalContract(
+            nftId,
+            address(0),
+            block.timestamp + 1 days,
+            block.timestamp + 366 days,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        
+        // Zero principal
+        vm.expectRevert("PropertyNFT: Principal must be positive");
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            block.timestamp + 1 days,
+            block.timestamp + 366 days,
+            0,
+            TEST_INTEREST_RATE
+        );
+        
+        // Invalid contract period
+        vm.expectRevert("PropertyNFT: Invalid contract period");
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            block.timestamp + 366 days,
+            block.timestamp + 1 days,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        
+        // Excessive interest rate
+        vm.expectRevert("PropertyNFT: Interest rate too high");
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            block.timestamp + 1 days,
+            block.timestamp + 366 days,
+            TEST_PRINCIPAL,
+            10001 // > 100%
+        );
+        
         vm.stopPrank();
-        
-        // Verify status change
-        Property memory property = propertyNFT.getProperty(tokenId);
-        assertEq(uint(property.status), uint(PropertyStatus.ACTIVE));
     }
     
-    function testUpdatePropertyStatusUnauthorized() public {
-        // Setup: Create property
-        vm.prank(landlord1);
-        uint256 proposalId = propertyNFT.proposeProperty(
-            DistributionChoice.DIRECT,
-            TEST_DEPOSIT_AMOUNT,
-            true, false, TEST_LTV, TEST_ADDRESS, TEST_DESCRIPTION
+    function test_createRentalContract_ContractAlreadyExists() public {
+        // Setup
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
         );
         
         vm.prank(verifier);
-        uint256 tokenId = propertyNFT.approvePropertyProposal(proposalId);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
         
-        // CALLER: unauthorized user (no PROPERTY_VERIFIER_ROLE)
-        vm.startPrank(unauthorized);
-        bytes32 requiredRole = propertyNFT.PROPERTY_VERIFIER_ROLE();
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                unauthorized,
-                requiredRole
-            )
+        // Create first contract
+        vm.prank(landlord);
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            block.timestamp + 1 days,
+            block.timestamp + 366 days,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
         );
-        propertyNFT.verifyProperty(tokenId);
-        vm.stopPrank();
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════
-    // Access Control Tests
-    // ═══════════════════════════════════════════════════════════════════
-    
-    function testRoleManagement() public {
-        // CALLER: admin (has DEFAULT_ADMIN_ROLE)
-        vm.startPrank(admin);
         
-        // Grant role
-        address newVerifier = makeAddr("newVerifier");
-        propertyNFT.grantRole(propertyNFT.PROPERTY_VERIFIER_ROLE(), newVerifier);
-        assertTrue(propertyNFT.hasRole(propertyNFT.PROPERTY_VERIFIER_ROLE(), newVerifier));
-        
-        // Revoke role
-        propertyNFT.revokeRole(propertyNFT.PROPERTY_VERIFIER_ROLE(), newVerifier);
-        assertFalse(propertyNFT.hasRole(propertyNFT.PROPERTY_VERIFIER_ROLE(), newVerifier));
-        
-        vm.stopPrank();
-    }
-    
-    function testUnauthorizedRoleManagement() public {
-        // CALLER: unauthorized user (no admin role)
-        vm.startPrank(unauthorized);
-        
-        address newVerifier = makeAddr("newVerifier");
-        bytes32 adminRole = propertyNFT.DEFAULT_ADMIN_ROLE();
-        
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                unauthorized,
-                adminRole
-            )
+        // Try to create second contract for same NFT
+        vm.prank(landlord);
+        vm.expectRevert("PropertyNFT: Rental contract already exists for this NFT");
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            block.timestamp + 1 days,
+            block.timestamp + 366 days,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
         );
-        propertyNFT.grantRole(propertyNFT.PROPERTY_VERIFIER_ROLE(), newVerifier);
-        
-        vm.stopPrank();
     }
     
     // ═══════════════════════════════════════════════════════════════════
-    // Emergency Pause Tests
+    // Contract Status Management Tests
     // ═══════════════════════════════════════════════════════════════════
     
-    function testPauseUnpause() public {
-        // CALLER: admin (has PAUSER_ROLE by default)
-        vm.startPrank(admin);
+    function test_activeRentalContractStatus_Success() public {
+        // Setup
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
+        );
         
-        // Pause contract
+        vm.prank(verifier);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
+        
+        uint256 startDate = block.timestamp;
+        vm.prank(landlord);
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            startDate,
+            startDate + 365 days,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        
+        // Activate contract (normally called by DepositPool)
+        propertyNFT.activeRentalContractStatus(nftId);
+        
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        assertEq(uint256(rentalContract.status), uint256(RentalContractStatus.ACTIVE));
+    }
+    
+    function test_outstandingProperty_Success() public {
+        // Setup complete rental contract
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
+        );
+        
+        vm.prank(verifier);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
+        
+        uint256 startDate = block.timestamp;
+        uint256 endDate = startDate + 365 days;
+        
+        vm.prank(landlord);
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            startDate,
+            endDate,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        
+        propertyNFT.activeRentalContractStatus(nftId);
+        
+        // Fast forward past contract end + grace period
+        vm.warp(endDate + 1 days + 1 seconds);
+        
+        vm.expectEmit(true, false, false, true);
+        emit PropertyStatusUpdated(propertyId, PropertyStatus.REGISTERED, PropertyStatus.SUSPENDED);
+        
+        vm.expectEmit(true, false, false, true);
+        emit DebtPropertyListed(nftId, TEST_PRINCIPAL, TEST_INTEREST_RATE);
+        
+        propertyNFT.outstandingProperty(nftId);
+        
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        assertEq(uint256(rentalContract.status), uint256(RentalContractStatus.OUTSTANDING));
+        
+        Property memory prop = propertyNFT.getProperty(propertyId);
+        assertEq(uint256(prop.status), uint256(PropertyStatus.SUSPENDED));
+    }
+    
+    function test_outstandingProperty_GracePeriodNotPassed() public {
+        // Setup
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
+        );
+        
+        vm.prank(verifier);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
+        
+        uint256 startDate = block.timestamp;
+        uint256 endDate = startDate + 365 days;
+        
+        vm.prank(landlord);
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            startDate,
+            endDate,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        
+        propertyNFT.activeRentalContractStatus(nftId);
+        
+        // Fast forward to just after contract end but within grace period
+        vm.warp(endDate + 12 hours);
+        
+        vm.expectRevert("PropertyNFT: Grace period not passed");
+        propertyNFT.outstandingProperty(nftId);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // Debt Transfer Tests
+    // ═══════════════════════════════════════════════════════════════════
+    
+    function test_transferDebt_Success() public {
+        // Setup outstanding contract
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
+        );
+        
+        vm.prank(verifier);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
+        
+        uint256 startDate = block.timestamp;
+        uint256 endDate = startDate + 365 days;
+        
+        vm.prank(landlord);
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            startDate,
+            endDate,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        
+        propertyNFT.activeRentalContractStatus(nftId);
+        vm.warp(endDate + 1 days + 1 seconds);
+        propertyNFT.outstandingProperty(nftId);
+        
+        // Transfer debt
+        propertyNFT.transferDebt(nftId, assignee);
+        
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        assertEq(rentalContract.tenantOrAssignee, assignee);
+    }
+    
+    function test_transferDebt_InvalidAssignee() public {
+        // Setup outstanding contract
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
+        );
+        
+        vm.prank(verifier);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
+        
+        uint256 startDate = block.timestamp;
+        uint256 endDate = startDate + 365 days;
+        
+        vm.prank(landlord);
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            startDate,
+            endDate,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        
+        propertyNFT.activeRentalContractStatus(nftId);
+        vm.warp(endDate + 1 days + 1 seconds);
+        propertyNFT.outstandingProperty(nftId);
+        
+        vm.expectRevert("PropertyNFT: Invalid assignee address");
+        propertyNFT.transferDebt(nftId, address(0));
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // View Function Tests
+    // ═══════════════════════════════════════════════════════════════════
+    
+    function test_getLandlordProperties() public {
+        // Register multiple properties
+        vm.startPrank(landlord);
+        
+        uint256 propertyId1 = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
+        );
+        
+        uint256 propertyId2 = propertyNFT.registerProperty(
+            landlord,
+            address(0),
+            7000,
+            keccak256("456 Another Street")
+        );
+        
+        vm.stopPrank();
+        
+        uint256[] memory properties = propertyNFT.getLandlordProperties(landlord);
+        assertEq(properties.length, 2);
+        assertEq(properties[0], propertyId1);
+        assertEq(properties[1], propertyId2);
+    }
+    
+    function test_getRentalContractsByStatus() public {
+        // Setup multiple contracts
+        vm.prank(landlord);
+        uint256 propertyId1 = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
+        );
+        
+        vm.prank(landlord);
+        uint256 propertyId2 = propertyNFT.registerProperty(
+            landlord,
+            address(0),
+            7000,
+            keccak256("456 Another Street")
+        );
+        
+        vm.prank(verifier);
+        uint256 nftId1 = propertyNFT.approveProperty(propertyId1);
+        
+        vm.prank(verifier);
+        uint256 nftId2 = propertyNFT.approveProperty(propertyId2);
+        
+        // Create contracts
+        vm.startPrank(landlord);
+        propertyNFT.createRentalContract(
+            nftId1,
+            tenant,
+            block.timestamp,
+            block.timestamp + 365 days,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        
+        propertyNFT.createRentalContract(
+            nftId2,
+            tenant,
+            block.timestamp,
+            block.timestamp + 365 days,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        vm.stopPrank();
+        
+        // Both should be PENDING
+        uint256[] memory pendingContracts = propertyNFT.getRentalContractsByStatus(RentalContractStatus.PENDING);
+        assertEq(pendingContracts.length, 2);
+        assertEq(pendingContracts[0], nftId1);
+        assertEq(pendingContracts[1], nftId2);
+        
+        // Activate one contract
+        propertyNFT.activeRentalContractStatus(nftId1);
+        
+        // Check status filtering
+        uint256[] memory activeContracts = propertyNFT.getRentalContractsByStatus(RentalContractStatus.ACTIVE);
+        assertEq(activeContracts.length, 1);
+        assertEq(activeContracts[0], nftId1);
+        
+        uint256[] memory stillPendingContracts = propertyNFT.getRentalContractsByStatus(RentalContractStatus.PENDING);
+        assertEq(stillPendingContracts.length, 1);
+        assertEq(stillPendingContracts[0], nftId2);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // Access Control & Pausable Tests
+    // ═══════════════════════════════════════════════════════════════════
+    
+    function test_pause_OnlyPauserRole() public {
+        vm.prank(admin);
         propertyNFT.pause();
         assertTrue(propertyNFT.paused());
         
-        // Unpause contract
+        vm.prank(admin);
         propertyNFT.unpause();
         assertFalse(propertyNFT.paused());
         
-        vm.stopPrank();
-    }
-    
-    function testUnauthorizedPause() public {
-        // CALLER: unauthorized user (no PAUSER_ROLE)
-        vm.startPrank(unauthorized);
-        
-        bytes32 pauserRole = propertyNFT.PAUSER_ROLE();
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                unauthorized,
-                pauserRole
-            )
-        );
+        // Non-pauser should fail
+        vm.prank(landlord);
+        vm.expectRevert();
         propertyNFT.pause();
-        
-        vm.stopPrank();
     }
     
-    function testFunctionsWhenPaused() public {
-        // Pause contract
+    function test_pausedFunctionality() public {
         vm.prank(admin);
         propertyNFT.pause();
         
-        // CALLER: landlord1 - should fail when paused
-        vm.startPrank(landlord1);
-        vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        propertyNFT.proposeProperty(
-            DistributionChoice.DIRECT,
-            TEST_DEPOSIT_AMOUNT,
-            true, false, TEST_LTV, TEST_ADDRESS, TEST_DESCRIPTION
+        // Should revert when paused
+        vm.prank(landlord);
+        vm.expectRevert();
+        propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
         );
-        vm.stopPrank();
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // Repayment Function Tests
+    // ═══════════════════════════════════════════════════════════════════
+    
+    function test_incrementTotalRepaidAmount() public {
+        // Setup
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
+        );
+        
+        vm.prank(verifier);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
+        
+        vm.prank(landlord);
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            block.timestamp,
+            block.timestamp + 365 days,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        
+        // Test increment
+        uint256 increment = 50_000_000;
+        propertyNFT.incrementTotalRepaidAmount(nftId, increment);
+        
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        assertEq(rentalContract.totalRepaidAmount, TEST_PRINCIPAL + increment);
+    }
+    
+    function test_incrementCurrentRepaidAmount() public {
+        // Setup
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
+        );
+        
+        vm.prank(verifier);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
+        
+        vm.prank(landlord);
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            block.timestamp,
+            block.timestamp + 365 days,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        
+        // Test increment
+        uint256 increment = 25_000_000;
+        propertyNFT.incrementCurrentRepaidAmount(nftId, increment);
+        
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        assertEq(rentalContract.currentRepaidAmount, increment);
+    }
+    
+    function test_updateLastRepaymentTime() public {
+        // Setup
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
+        );
+        
+        vm.prank(verifier);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
+        
+        vm.prank(landlord);
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            block.timestamp,
+            block.timestamp + 365 days,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        
+        // Test update
+        uint256 newTime = block.timestamp + 30 days;
+        vm.warp(newTime);
+        propertyNFT.updateLastRepaymentTime(nftId, newTime);
+        
+        RentalContract memory rentalContract = propertyNFT.getRentalContract(nftId);
+        assertEq(rentalContract.lastRepaymentTime, newTime);
+    }
+    
+    function test_updateLastRepaymentTime_InvalidTime() public {
+        // Setup
+        vm.prank(landlord);
+        uint256 propertyId = propertyNFT.registerProperty(
+            landlord,
+            trustAuthority,
+            TEST_LTV,
+            TEST_ADDRESS
+        );
+        
+        vm.prank(verifier);
+        uint256 nftId = propertyNFT.approveProperty(propertyId);
+        
+        vm.prank(landlord);
+        propertyNFT.createRentalContract(
+            nftId,
+            tenant,
+            block.timestamp,
+            block.timestamp + 365 days,
+            TEST_PRINCIPAL,
+            TEST_INTEREST_RATE
+        );
+        
+        // Set initial time
+        uint256 initialTime = block.timestamp + 30 days;
+        vm.warp(initialTime);
+        propertyNFT.updateLastRepaymentTime(nftId, initialTime);
+        
+        // Try to set earlier time (should fail)
+        vm.expectRevert("PropertyNFT: Invalid time");
+        propertyNFT.updateLastRepaymentTime(nftId, initialTime - 1 days);
     }
 }
