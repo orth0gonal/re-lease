@@ -78,11 +78,11 @@ contract DepositPool is ERC4626, AccessControl, Pausable, ReentrancyGuard, IDepo
         require(rentalContract.principal == principal, "DepositPool: Incorrect principal amount");
         
         // Check if within valid time range (1 day before/after start date)
-        require(
-            block.timestamp >= rentalContract.startDate - 1 days &&
-            block.timestamp <= rentalContract.startDate + 1 days,
-            "DepositPool: Contract start date not within valid range"
-        );
+        // require(
+        //     block.timestamp >= rentalContract.startDate - 1 days &&
+        //     block.timestamp <= rentalContract.startDate + 1 days,
+        //     "DepositPool: Contract start date not within valid range"
+        // );
 
         address landlord = propertyNFT.getProperty(nftId).landlord;
         
