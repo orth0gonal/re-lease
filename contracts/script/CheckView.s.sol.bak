@@ -1,0 +1,223 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "forge-std/Script.sol";
+import "forge-std/console.sol";
+import "../src/KRWToken.sol";
+import "../src/PropertyNFT.sol";
+import "../src/DepositPool.sol";
+
+/**
+ * @title CheckView
+ * @dev View function verification script for deployed Re-Lease contracts on Kaia testnet
+ */
+contract CheckView is Script {
+    // Deployed contract addresses from kaia_testnet.json
+    address public constant KRW_TOKEN_ADDRESS = 0x8F83a3f4bdc8D95B80495c7210F3e34c1Fb473d4;
+    address public constant PROPERTY_NFT_ADDRESS = 0xF37D765250A25933D1f46C25Db1b5cEC68290E56;
+    address public constant DEPOSIT_POOL_ADDRESS = 0x79ab091Af72eFd65184E3d964D181D22cFa4b055;
+    
+    // Contract instances
+    KRWToken public krwToken;
+    PropertyNFT public propertyNFT;
+    DepositPool public depositPool;
+    
+    function run() external view {
+        // Initialize contract instances as local variables
+        KRWToken krwTokenLocal = KRWToken(KRW_TOKEN_ADDRESS);
+        PropertyNFT propertyNFTLocal = PropertyNFT(PROPERTY_NFT_ADDRESS);
+        DepositPool depositPoolLocal = DepositPool(DEPOSIT_POOL_ADDRESS);
+        
+        console.log("=== Re-Lease Contract View Function Verification ===");
+        console.log("Network: Kaia Testnet (Chain ID: 1001)");
+        console.log("");
+        
+        // Check KRW Token
+        _checkKRWToken(krwTokenLocal);
+        console.log("");
+        
+        // Check PropertyNFT
+        _checkPropertyNFT(propertyNFTLocal);
+        console.log("");
+        
+        // Check DepositPool
+        _checkDepositPool(depositPoolLocal);
+        console.log("");
+        
+        // Check integration
+        _checkIntegration(krwTokenLocal, propertyNFTLocal, depositPoolLocal);
+        
+        console.log("=== View Function Verification Complete ===");
+    }
+    
+    /**
+     * @dev Check KRW Token view functions
+     */
+    function _checkKRWToken() internal view {
+        console.log("1. KRW Token View Functions:");
+        console.log("   Address:", address(krwToken));
+        
+        try krwToken.name() returns (string memory name) {
+            console.log("   Name:", name);
+        } catch {
+            console.log("   Name: ERROR - Failed to call name()");
+        }
+        
+        try krwToken.symbol() returns (string memory symbol) {
+            console.log("   Symbol:", symbol);
+        } catch {
+            console.log("   Symbol: ERROR - Failed to call symbol()");
+        }
+        
+        try krwToken.decimals() returns (uint8 decimals) {
+            console.log("   Decimals:", decimals);
+        } catch {
+            console.log("   Decimals: ERROR - Failed to call decimals()");
+        }
+        
+        try krwToken.totalSupply() returns (uint256 totalSupply) {
+            console.log("   Total Supply:", totalSupply);
+        } catch {
+            console.log("   Total Supply: ERROR - Failed to call totalSupply()");
+        }
+        
+        // Check deployer balance
+        address deployer = vm.envAddress("DEPLOYER_ADDRESS");
+        try krwToken.balanceOf(deployer) returns (uint256 balance) {
+            console.log("   Deployer Balance:", balance);
+        } catch {
+            console.log("   Deployer Balance: ERROR - Failed to call balanceOf()");
+        }
+    }
+    
+    /**
+     * @dev Check PropertyNFT view functions
+     */
+    function _checkPropertyNFT() internal view {
+        console.log("2. PropertyNFT View Functions:");
+        console.log("   Address:", address(propertyNFT));
+        
+        try propertyNFT.name() returns (string memory name) {
+            console.log("   Name:", name);
+        } catch {
+            console.log("   Name: ERROR - Failed to call name()");
+        }
+        
+        try propertyNFT.symbol() returns (string memory symbol) {
+            console.log("   Symbol:", symbol);
+        } catch {
+            console.log("   Symbol: ERROR - Failed to call symbol()");
+        }
+        
+        try propertyNFT.totalSupply() returns (uint256 totalSupply) {
+            console.log("   Total Supply:", totalSupply);
+        } catch {
+            console.log("   Total Supply: ERROR - Failed to call totalSupply()");
+        }
+        
+        // Check if deployer has any NFTs
+        address deployer = vm.envAddress("DEPLOYER_ADDRESS");
+        try propertyNFT.balanceOf(deployer) returns (uint256 balance) {
+            console.log("   Deployer NFT Balance:", balance);
+        } catch {
+            console.log("   Deployer NFT Balance: ERROR - Failed to call balanceOf()");
+        }
+    }
+    
+    /**
+     * @dev Check DepositPool view functions
+     */
+    function _checkDepositPool() internal view {
+        console.log("3. DepositPool (ERC-4626 Vault) View Functions:");
+        console.log("   Address:", address(depositPool));
+        
+        try depositPool.name() returns (string memory name) {
+            console.log("   Vault Name:", name);
+        } catch {
+            console.log("   Vault Name: ERROR - Failed to call name()");
+        }
+        
+        try depositPool.symbol() returns (string memory symbol) {
+            console.log("   Vault Symbol:", symbol);
+        } catch {
+            console.log("   Vault Symbol: ERROR - Failed to call symbol()");
+        }
+        
+        try depositPool.decimals() returns (uint8 decimals) {
+            console.log("   Vault Decimals:", decimals);
+        } catch {
+            console.log("   Vault Decimals: ERROR - Failed to call decimals()");
+        }
+        
+        try depositPool.asset() returns (address asset) {
+            console.log("   Underlying Asset:", asset);
+            console.log("   Asset Match KRW Token:", asset == address(krwToken) ? "YES" : "NO");
+        } catch {
+            console.log("   Underlying Asset: ERROR - Failed to call asset()");
+        }
+        
+        try depositPool.totalAssets() returns (uint256 totalAssets) {
+            console.log("   Total Assets (KRWC):", totalAssets);
+        } catch {
+            console.log("   Total Assets: ERROR - Failed to call totalAssets()");
+        }
+        
+        try depositPool.totalSupply() returns (uint256 totalSupply) {
+            console.log("   Total Vault Shares:", totalSupply);
+        } catch {
+            console.log("   Total Vault Shares: ERROR - Failed to call totalSupply()");
+        }
+        
+        // Check deployer's vault balance
+        address deployer = vm.envAddress("DEPLOYER_ADDRESS");
+        try depositPool.balanceOf(deployer) returns (uint256 balance) {
+            console.log("   Deployer Vault Shares:", balance);
+        } catch {
+            console.log("   Deployer Vault Shares: ERROR - Failed to call balanceOf()");
+        }
+    }
+    
+    /**
+     * @dev Check contract integration and references
+     */
+    function _checkIntegration() internal view {
+        console.log("4. Contract Integration Verification:");
+        
+        // Check DepositPool references
+        try depositPool.propertyNFT() returns (PropertyNFT propertyNFTRef) {
+            console.log("   DepositPool -> PropertyNFT:", address(propertyNFTRef));
+            console.log("   PropertyNFT Reference Match:", address(propertyNFTRef) == address(propertyNFT) ? "YES" : "NO");
+        } catch {
+            console.log("   DepositPool -> PropertyNFT: ERROR - Failed to call propertyNFT()");
+        }
+        
+        try depositPool.asset() returns (address assetRef) {
+            console.log("   DepositPool -> KRW Token (asset):", assetRef);
+            console.log("   Asset Reference Match:", assetRef == address(krwToken) ? "YES" : "NO");
+        } catch {
+            console.log("   DepositPool -> Asset: ERROR - Failed to call asset()");
+        }
+        
+        // Check access control
+        address deployer = vm.envAddress("DEPLOYER_ADDRESS");
+        console.log("   Deployer Address:", deployer);
+        
+        try krwToken.hasRole(krwToken.DEFAULT_ADMIN_ROLE(), deployer) returns (bool hasRole) {
+            console.log("   Deployer has KRW Token Admin:", hasRole ? "YES" : "NO");
+        } catch {
+            console.log("   KRW Token Admin Check: ERROR");
+        }
+        
+        try propertyNFT.hasRole(propertyNFT.DEFAULT_ADMIN_ROLE(), deployer) returns (bool hasRole) {
+            console.log("   Deployer has PropertyNFT Admin:", hasRole ? "YES" : "NO");
+        } catch {
+            console.log("   PropertyNFT Admin Check: ERROR");
+        }
+        
+        try depositPool.hasRole(depositPool.DEFAULT_ADMIN_ROLE(), deployer) returns (bool hasRole) {
+            console.log("   Deployer has DepositPool Admin:", hasRole ? "YES" : "NO");
+        } catch {
+            console.log("   DepositPool Admin Check: ERROR");
+        }
+    }
+}
