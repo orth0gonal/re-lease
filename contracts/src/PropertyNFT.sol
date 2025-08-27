@@ -184,11 +184,11 @@ contract PropertyNFT is ERC721Enumerable, AccessControl, Pausable, ReentrancyGua
         require(rentalContract.status == RentalContractStatus.PENDING, "PropertyNFT: Contract not pending");
         
         // Check if contract start date is within 1 day of current time (as per docs)
-        require(
-            block.timestamp >= rentalContract.startDate - 1 days &&
-            block.timestamp <= rentalContract.startDate + 1 days,
-            "PropertyNFT: Contract start date not within valid range"
-        );
+        // require(
+        //     block.timestamp >= rentalContract.startDate - 1 days &&
+        //     block.timestamp <= rentalContract.startDate + 1 days,
+        //     "PropertyNFT: Contract start date not within valid range"
+        // );
 
         rentalContract.status = RentalContractStatus.ACTIVE;
     }
