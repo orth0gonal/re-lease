@@ -40,8 +40,8 @@ export function WalletConnectButton() {
                 return (
                   <Button
                     onClick={openConnectModal}
-                    size="lg"
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                    size="sm"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground h-9"
                   >
                     <Wallet className="w-4 h-4 mr-2" />
                     Connect Wallet
@@ -54,7 +54,8 @@ export function WalletConnectButton() {
                   <Button
                     onClick={openChainModal}
                     variant="destructive"
-                    size="lg"
+                    size="sm"
+                    className="h-9"
                   >
                     Wrong network
                   </Button>
@@ -62,24 +63,16 @@ export function WalletConnectButton() {
               }
 
               return (
-                <div className="flex items-center gap-3">
-                  {account.displayBalance && (
-                    <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
-                      <Wallet className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">
-                        {account.displayBalance}
-                      </span>
-                    </div>
-                  )}
-                  
-                  <div className="flex gap-2">
+                <div className="flex items-center gap-4">
+                  <div className="flex gap-4">
+                    {/* Chain button - hidden on mobile (same breakpoint as menu) */}
                     <Button
                       onClick={openChainModal}
                       variant="outline"
-                      size="sm"
-                      className="flex items-center gap-2"
+                      size="icon"
+                      className="hidden md:flex"
                     >
-                      {chain.hasIcon && (
+                      {chain.hasIcon && chain.iconUrl ? (
                         <div
                           style={{
                             background: chain.iconBackground,
@@ -87,27 +80,46 @@ export function WalletConnectButton() {
                             height: 16,
                             borderRadius: 999,
                             overflow: 'hidden',
-                            marginRight: 4,
                           }}
                         >
-                          {chain.iconUrl && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              alt={chain.name ?? 'Chain icon'}
-                              src={chain.iconUrl}
-                              style={{ width: 16, height: 16 }}
-                            />
-                          )}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            alt={chain.name ?? 'Chain icon'}
+                            src={chain.iconUrl}
+                            style={{ width: 16, height: 16 }}
+                          />
                         </div>
+                      ) : (
+                        <ChevronDown className="h-[1.2rem] w-[1.2rem]" />
                       )}
-                      <span className="hidden sm:inline">{chain.name}</span>
-                      <ChevronDown className="w-3 h-3" />
+                      <span className="sr-only">Switch chain</span>
                     </Button>
 
+                    {/* Balance Display - positioned next to chain button */}
+                    {account.displayBalance && (
+                      <div className="hidden md:flex items-center justify-between px-3 py-2 bg-muted border border-input rounded-md h-10 min-w-0">
+                        <Wallet className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm font-medium ml-2">
+                          {(() => {
+                            // Format balance to max 2 decimal places
+                            const balance = account.displayBalance;
+                            const match = balance.match(/^(\d+\.?\d*)\s*(.+)$/);
+                            if (match) {
+                              const [, number, currency] = match;
+                              const formattedNumber = parseFloat(number).toFixed(2);
+                              return `${formattedNumber} ${currency}`;
+                            }
+                            return balance;
+                          })()}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Account button - visible on mobile */}
                     <Button
                       onClick={openAccountModal}
                       variant="outline"
-                      size="sm"
+                      size="default"
                       className="flex items-center gap-2"
                     >
                       <span className="font-mono text-xs">

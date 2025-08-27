@@ -29,6 +29,8 @@ export function RainbowKitThemeProvider({ children }: RainbowKitThemeProviderPro
           overlayBlur: 'small',
         })}
         showRecentTransactions={true}
+        modalSize="compact"
+        initialChain={undefined}
       >
         {children}
       </RainbowKitProvider>
@@ -51,6 +53,8 @@ export function RainbowKitThemeProvider({ children }: RainbowKitThemeProviderPro
         overlayBlur: 'small',
       })}
       showRecentTransactions={true}
+      modalSize="compact"
+      initialChain={undefined}
     >
       {children}
     </RainbowKitProvider>
