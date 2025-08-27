@@ -1,5 +1,20 @@
 # re:Lease
 
+<div align="center">
+
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-blue?logo=react&logoColor=white)](https://reactjs.org/)
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.20-lightgrey?logo=solidity&logoColor=black)](https://soliditylang.org/)
+[![Foundry](https://img.shields.io/badge/Foundry-toolkit-red?logo=ethereum&logoColor=white)](https://book.getfoundry.sh/)
+[![Kaia](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://docs.kaia.io/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+
+[![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-Visit_Platform-success)](https://team-release.vercel.app/)
+[![Hackathon](https://img.shields.io/badge/🏆_Kaia_Hackathon-DoraHacks-orange)](https://dorahacks.io/buidl/31903/)
+[![Documentation](https://img.shields.io/badge/📚_Documentation-View_Docs-informational)](docs/)
+
+</div>
+
 > **블록체인 기술로 한국 전세 계약을 혁신하다**
 
 한국 전세 보증금 보호를 위한 포괄적인 블록체인 솔루션으로, Kaia 블록체인과 KRWC 스테이블코인 통합, 자동화된 P2P 채권 거래를 제공합니다.
