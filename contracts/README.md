@@ -1,17 +1,6 @@
-## Foundry
+## Re-lease Smart Contract
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
-
-Foundry consists of:
-
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
-
-## Documentation
-
-https://book.getfoundry.sh/
+Re-lease smart contract에 대한 자세한 문서는 [docs.md](docs.md)를 참고
 
 ## Usage
 
@@ -21,13 +10,13 @@ https://book.getfoundry.sh/
 $ forge build
 ```
 
-### Deploy
+### Deploy Contracts
 
 ```shell
 $ forge script script/Deploy.s.sol:Deploy --broadcast --legacy --slow --rpc-url kaia_testnet --private-key $DEPLOYER_PRIVATE_KEY -vvv
 ```
 
-### Mint KRWC
+### Mint KRWC token
 
 ```shell
 $ forge script script/MintKRWC.s.sol:MintKRWC --broadcast --legacy --slow --rpc-url kaia_testnet --private-key $DEPLOYER_PRIVATE_KEY -vvv
@@ -41,12 +30,14 @@ cast send <KRWCToken> "transfer(address,uint256)()" <DepositPool> <KRWCAmount> -
 
 ### Test
 
+#### Run All Tests
+
+```shell
+$ forge test
+```
+
 #### Unit Tests
 ```shell
-# Run all tests
-$ forge test
-
-# Run unit tests
 $ forge test --match-contract PropertyNFTTest -v
 $ forge test --match-contract DepositPoolTest -v
 ```
@@ -105,7 +96,4 @@ $ forge test --mt test_BatchExpiration_MultipleContracts -vv
 ```shell
 # Run all integration tests with verbose output
 $ forge test --match-path test/integration/ -vvv
-
-# Run all integration tests with gas report
-$ forge test --match-path test/integration/ --gas-report
 ```
