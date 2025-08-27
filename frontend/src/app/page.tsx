@@ -1,15 +1,14 @@
 'use client'
 
 import { WalletConnectButton } from '@/components/wallet/wallet-connect-button'
-import { AccountBalance } from '@/components/wallet/account-balance'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Logo, LogoIcon } from '@/components/ui/logo'
+import { Logo } from '@/components/ui/logo'
 import { RoleCard } from '@/components/ui/role-card'
 import { Home as HomeIcon, User as UserIcon, TrendingUp as TrendingUpIcon } from 'lucide-react'
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted flex flex-col">
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Logo />
@@ -20,33 +19,22 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-12">
+      <main className="container mx-auto px-4 py-12 flex-grow">
         <div className="text-center space-y-6 mb-16">
           <h2 className="text-4xl font-bold tracking-tight sm:text-6xl">
-            <span className="text-primary">re:Lease</span> the Future
+            <span className="text-primary">re:</span>Lease the <span className="text-primary">Future</span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Stablecoin-powered platform for Korean Jeonse rental agreements.
+            Stablecoin-powered Jeonse Platform with Auto-Debt Conversion
           </p>
         </div>
 
         <div className="max-w-6xl mx-auto mb-12">
           <h3 className="text-2xl font-semibold text-center mb-8 text-foreground">Choose Your Role</h3>
-          <div className="grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 px-4 sm:px-0">
-            <RoleCard
-              title="Landlord"
-              description="From landlord to debtor when lease ends"
-              icon={HomeIcon}
-              color="blue"
-              onClick={() => {
-                // TODO: Navigate to landlord dashboard
-                console.log('Landlord selected')
-              }}
-            />
-            
+          <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-3 px-4 sm:px-0">
             <RoleCard
               title="Tenant"
-              description="From tenant to creditor when lease ends"
+              description="Deposit KRWC for guaranteed protection. Become creditor with automatic recovery system."
               icon={UserIcon}
               color="green"
               onClick={() => {
@@ -56,35 +44,39 @@ export default function Home() {
             />
             
             <RoleCard
+              title="Landlord"
+              description="Receive yKRWC tokens earning 3-5% yield. Hold for returns or sell for liquidity."
+              icon={HomeIcon}
+              color="blue"
+              onClick={() => {
+                // TODO: Navigate to landlord dashboard
+                console.log('Landlord selected')
+              }}
+            />
+            
+            <RoleCard
               title="Assignee"
-              description="Third-party investor buying tenant claims"
+              description="Purchase defaulted debt with real estate collateral and priority recovery rights."
               icon={TrendingUpIcon}
               color="purple"
               onClick={() => {
                 // TODO: Navigate to assignee marketplace
                 console.log('Assignee selected')
               }}
-              className="sm:col-span-2 lg:col-span-1 sm:max-w-md sm:mx-auto lg:max-w-none lg:mx-0"
             />
           </div>
         </div>
 
-        <div className="flex flex-col items-center space-y-6">
-          <AccountBalance />
-        </div>
       </main>
 
-      <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 mt-12">
+      <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 mt-auto">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <div className="flex items-center space-x-2">
-              <LogoIcon size="sm" />
-              <span className="text-sm text-muted-foreground">
-                Powered by Kaia Blockchain
-              </span>
-            </div>
+            <span className="text-sm text-muted-foreground">
+              Powered by re:Lease
+            </span>
             <p className="text-sm text-muted-foreground">
-              © 2024 re:Lease. All rights reserved.
+              © 2025 re:Lease. All rights reserved.
             </p>
           </div>
         </div>
