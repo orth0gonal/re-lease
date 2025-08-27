@@ -4,52 +4,88 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## About re:Lease Platform
 
-**re:Lease** is a KRW stablecoin-powered smart contract platform for Korean Jeonse (전세) rental agreements, developed for the KAIA blockchain hackathon.
+re:Lease is a blockchain-based Jeonse (전세) deposit protection platform that fundamentally solves the Korean Jeonse fraud problem through automated debt-credit relationship establishment and tokenization.
 
-### Core Concept
-- **KRW Stablecoin Integration**: Uses KRW-C (Korean Won stablecoin) as the primary payment method for Jeonse deposits, eliminating volatility risks through smart contract automation
-- **Tokenization Structure**: Converts deposited KRW-C into yield-bearing cKRW (compounded KRW) through ERC-4626 Vault to provide landlords with automatic yield generation and liquidity options  
-- **Automated Debt Recovery**: When landlords fail to return deposits, the system automatically creates creditor-debtor relationships with assignees who ensure tenant protection while earning interest income
+### Platform Name Meaning
+
+re:Lease: Combines 'Re (Again, New)' and 'Lease', meaning redefining the rental system
+Double meaning of 'Release': Unlocking landlords' tied assets and releasing tenants' anxiety
+
+### Core Problem Solved
+
+Korean Jeonse fraud has become a serious social issue with:
+- 4.5 trillion KRW in guarantee insurance accidents in 2024 (7x increase from 2021)
+- Over 30,400 confirmed fraud victims as of May 2025
+- Organized fraud schemes involving brokers, fake landlords, and trust companies
+
+### Solution Architecture
+
+1. KRW Stablecoin Integration
+- Primary Currency: Uses KRWC (Korean Won stablecoin) for all Jeonse deposits
+- Smart Contract Automation: All transactions and conditions automated through blockchain
+- Transparency: Real-time tracking of fund flows and contract states on-chain
+
+2. Deposit Tokenization System
+- yKRWC Token: ERC-4626 based yield-bearing token that increases in value over time
+- Deposit Pool: Central vault where all KRWC deposits are pooled and managed
+- Asset Management: Pool funds invested in safe assets (government bonds, AAA-grade bonds, stablecoin protocols) generating 3-5% annual returns
+- Revenue Distribution: 70% to yKRWC holders, 20% platform fees, 10% risk buffer
+
+3. Guaranteed Return Mechanism
+- Automatic Conversion: If landlord fails to return deposit, contract automatically converts to debt-credit relationship
+- Assignee System: Assignees can purchase the debt, immediately returning deposit to tenant
+- Legal Integration: Smart contracts integrated with legal proceedings for property foreclosure if needed
 
 ### Key Stakeholders
-- **Tenant (임차인)**: Renter who deposits KRW-C as Jeonse security deposit
-- **Landlord (임대인)**: Property owner who receives cKRW tokens and can either hold them for automatic yield or redeem them for liquidity
-- **Assignee (채권양수인)**: Investor who purchases defaulted deposits as debt assets, earning interest while protecting tenants
-- **Verifier (검증자)**: Authorized entity that validates property authenticity and contract legitimacy
+
+1. Tenant (임차인)
+- Benefits: Guaranteed deposit safety, transparent fund tracking, legal interest protection
+- Process: Deposits KRWC → Receives protection through smart contract and assignee system
+
+2. Landlord (임대인)
+- Benefits: Immediate liquidity through yKRWC trading, yield earnings from holding, potential tax benefits
+- Options:
+- - Option 1: Sell yKRWC for immediate cash
+- - Option 2: Hold yKRWC to earn yield while maintaining principal
+
+3. Assignee (채권양수인)
+- Benefits: Stable investment with real estate collateral, higher returns than traditional insurance
+- Protection: Priority in debt recovery under Korean Housing Lease Protection Act
+
+4. Verifier (운영사)
+- Role: Deposit pool management, property verification, smart contract operations
+- Revenue: Pool management fees, transaction fees, premium services
 
 ### Process Flow
 
 #### 1. Contract Initiation
-1. **Property Registration**: Landlord registers property as NFT (ERC-721) with PropertyNFT contract
-2. **Verification**: Verifier validates property authenticity and calls `PropertyNFT.verifyProperty(propertyId)`
-3. **Contract Creation**: Landlord creates rental contract with tenant details and deposit amount
-4. **Contract Verification**: Verifier approves the rental contract terms
 
-#### 2. Deposit & Tokenization  
-1. **Deposit Submission**: Tenant deposits KRW-C into ERC-4626 Vault smart contract
-2. **cKRW Generation**: System converts KRW-C to yield-bearing cKRW (compounded KRW) for landlord
-   - **cKRW**: Represents deposit with automatic yield accrual through vault strategy
-   - **Yield Mechanism**: Vault invests underlying KRW-C in safe assets, continuously compounding returns
-3. **Fund Management**: ERC-4626 Vault invests KRW-C in safe assets (government bonds, AAA-grade bonds)
-4. **Landlord Options**:
-   - Redeem cKRW directly through contract for immediate liquidity
-   - Hold cKRW to automatically earn yield from vault strategy
-   - Transfer cKRW to other parties while maintaining yield-bearing properties
+1. Tenant deposits KRWC into smart contract
+2. Smart contract deposits KRWC into deposit pool
+3. Pool issues yKRWC tokens to landlord
+4. Landlord chooses to hold (earn yield) or sell (get liquidity)
+
+#### 2. During Contract Period
+
+1. yKRWC value increases automatically through pool yield generation
+2. All parties can track contract status on blockchain
+3. No intermediary involvement required
 
 #### 3. Contract Maturity
-- **Normal Return**: Landlord burns cKRW through contract → equivalent KRW-C returned to tenant → contract closed
-- **Default Scenario**: If landlord cannot return cKRW → automatic debt-credit relationship activation
 
-#### 4. Debt Recovery Process
-1. **Assignee Intervention**: Assignee purchases the defaulted deposit claim
-2. **Immediate Protection**: Assignee pays KRW-C to tenant, ensuring deposit return
-3. **Debt Creation**: Landlord becomes debtor to assignee with legal interest rate (5% annual)
-4. **Long-term Recovery**: If payment fails, assignee initiates legal proceedings (foreclosure, auction) according to Korean law
-5. **Legal Integration**: Smart contract integrates with legal proceeding results through authorized updates
-6. **Settlement**: Upon legal resolution, verified settlement data is input to smart contract for final distribution
-   - Assignee receives principal + accumulated interest
-   - Remaining proceeds (if any) are returned to landlord
-   - All transactions are recorded on-chain for transparency
+1. Within 1-day grace period:
+- If landlord has yKRWC: Converts to KRWC, returns deposit to tenant, keeps yield
+- If landlord sold yKRWC: Must deposit KRWC directly to return to tenant
+
+2. After grace period (Default):
+- Automatic debt-credit relationship establishment
+- Assignee can purchase debt, immediately protecting tenant
+- Landlord owes principal + 5% annual interest to assignee
+
+#### 4. Debt Recovery
+- Assignee earns interest from landlord
+- If long-term default: Legal proceedings for property foreclosure
+- Smart contract integrates with legal resolution for final settlement
 
 ## Project Structure
 
@@ -89,12 +125,9 @@ anvil               # Start local Ethereum node
 
 ### Frontend Architecture
 - **Next.js 15** with React 19 and TypeScript
-- **App Router** structure (`src/app/` directory)
 - **Web3 Integration**: RainbowKit + Wagmi for wallet connectivity
-- **UI Components**: Radix UI primitives with Tailwind CSS
+- **UI Components**: Shadcn UI primitives with Tailwind CSS
 - **Styling**: Tailwind CSS with CSS custom properties and dark mode
-- **State Management**: TanStack Query for server state
-- **Theme System**: next-themes with custom component theming
 - **Blockchain**: Kaia network integration with balance tracking
 
 ### Smart Contract Architecture
@@ -119,3 +152,26 @@ This is a Web3 application where:
 3. **Web3 Integration**: Use Wagmi hooks and RainbowKit components for blockchain interactions
 4. **Styling**: Use Tailwind CSS classes with custom CSS properties for theming
 5. **Local Development**: Use `npm run dev` for frontend with Turbopack, `anvil` for local blockchain
+
+## Key Innovations
+
+### 1. Fraud Prevention Mechanisms
+
+- 깡통전세 (Underwater Jeonse): Pre-verification of property value and LTV limits
+- Fake Landlords: On-chain verification with government registry
+- Trust Company Fraud: Automatic trust authority verification
+- Double Contracts: Blockchain prevents duplicate contracts on same property
+- Loan Execution Fraud: Financial authority integration for loan detection
+
+### 2. Economic Sustainability
+
+- Revenue Sources: Pool management fees (1% annual), transaction fees (0.5%), premium services
+- Market Size: Targeting 0.1% of 400 trillion KRW Korean Jeonse market
+- Expansion: Extensible to monthly rent, commercial real estate, international markets
+
+### 3. Technical Advantages
+
+- Automatic Execution: Smart contracts eliminate manual intervention
+- Transparency: All transactions visible on blockchain
+- Composability: Integration with other DeFi protocols
+- Scalability: KAIA's high TPS supports mass adoption
