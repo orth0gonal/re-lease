@@ -2,8 +2,7 @@
 
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp, Shield, Building2, Search, DollarSign, Users } from 'lucide-react'
 
 export default function AssigneePage() {
