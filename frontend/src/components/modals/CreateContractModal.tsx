@@ -3,16 +3,16 @@
 import { useState, useEffect } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { useConnectModal } from '@rainbow-me/rainbowkit'
-import { isAddress, parseUnits } from 'viem'
+import { isAddress } from 'viem'
 import { useGlobalToast } from '@/hooks/use-global-toast'
 import { GlobalModal } from '@/components/ui/global-modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle, Loader2, Wallet, Building, Calendar } from 'lucide-react'
-import { CONTRACTS } from '@/lib/constants'
-import { PropertyNFTABI } from '@/lib/abis/PropertyNFT'
+import { AlertCircle, Loader2, Wallet, Building } from 'lucide-react'
+// import { CONTRACTS } from '@/lib/constants'
+// import { PropertyNFTABI } from '@/lib/abis/PropertyNFT'
 
 interface CreateContractModalProps {
   open: boolean
@@ -103,13 +103,13 @@ export function CreateContractModal({ open, onOpenChange }: CreateContractModalP
     principal: '',
     debtInterestRate: '5'
   })
-  const [isLoadingTimeout, setIsLoadingTimeout] = useState(false)
+  // const [isLoadingTimeout, setIsLoadingTimeout] = useState(false)
 
   const { 
-    writeContract, 
+    // writeContract, 
     data: hash, 
     isPending, 
-    error 
+    // error 
   } = useWriteContract()
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -207,7 +207,7 @@ export function CreateContractModal({ open, onOpenChange }: CreateContractModalP
       console.error('Error creating rental contract:', error)
       
       // Type guard for error object
-      const errorObj = error as any
+      const errorObj = error as Record<string, unknown>
       console.error('Error details:', { 
         message: errorObj?.message, 
         code: errorObj?.code, 
