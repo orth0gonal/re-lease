@@ -2,16 +2,19 @@
 
 import { useState } from 'react'
 import { WalletConnectButton } from '@/components/wallet/wallet-connect-button'
+import { SwitchChainButton } from '@/components/wallet/switch-chain-button'
 import { MobileWalletInfo } from '@/components/wallet/mobile-wallet-info'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Logo } from '@/components/ui/logo'
 import { Navigation } from '@/components/ui/navigation'
 import { Button } from '@/components/ui/button'
-import { Menu, X } from 'lucide-react'
+import { FaucetModal } from '@/components/modals/FaucetModal'
+import { Menu, X, Droplets } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isFaucetModalOpen, setIsFaucetModalOpen] = useState(false)
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen)
   const closeMenu = () => setIsMenuOpen(false)
@@ -24,9 +27,18 @@ export function Navbar() {
           <Navigation className="hidden md:flex" />
         </div>
         
-        {/* Desktop: Theme + Wallet */}
-        <div className="hidden md:flex items-center space-x-4">
+        {/* Desktop: Theme + Switch Chain + Faucet + Balance */}
+        <div className="hidden md:flex items-center space-x-1.5">
           <ThemeToggle />
+          <SwitchChainButton />
+          <Button
+            onClick={() => setIsFaucetModalOpen(true)}
+            variant="outline"
+            size="icon"
+            aria-label="Open faucet"
+          >
+            <Droplets className="h-[1.2rem] w-[1.2rem]" />
+          </Button>
           <WalletConnectButton />
         </div>
 
@@ -59,6 +71,12 @@ export function Navbar() {
           <Navigation className="flex flex-col space-y-2 space-x-0" onItemClick={closeMenu} />
         </div>
       </div>
+
+      {/* Faucet Modal */}
+      <FaucetModal
+        open={isFaucetModalOpen}
+        onOpenChange={setIsFaucetModalOpen}
+      />
     </header>
   )
 }

@@ -3,15 +3,22 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Wallet, ChevronDown } from 'lucide-react'
+import { SwitchChainButton } from '@/components/wallet/switch-chain-button'
+import { FaucetModal } from '@/components/modals/FaucetModal'
+import { BalanceModal } from '@/components/modals/BalanceModal'
+import { Wallet, Droplets } from 'lucide-react'
+import { useState } from 'react'
 
 export function MobileWalletInfo() {
+  const [isFaucetModalOpen, setIsFaucetModalOpen] = useState(false)
+  const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false)
+  
   return (
-    <ConnectButton.Custom>
+    <>
+      <ConnectButton.Custom>
       {({
         account,
         chain,
-        openChainModal,
         authenticationStatus,
         mounted,
       }) => {
@@ -26,42 +33,29 @@ export function MobileWalletInfo() {
         return (
           <div className="w-full">
             {connected ? (
-              /* When connected: Theme + Chain + Balance (same order as main navbar) */
-              <div className="flex gap-4 items-center w-full">
+              /* When connected: Theme + Switch Chain + Faucet + Balance (same order as main navbar) */
+              <div className="flex gap-3 items-center w-full">
                 <ThemeToggle />
                 
+                <SwitchChainButton />
+
                 <Button
-                  onClick={openChainModal}
+                  onClick={() => setIsFaucetModalOpen(true)}
                   variant="outline"
                   size="icon"
                   className="flex"
                 >
-                  {chain.hasIcon && chain.iconUrl ? (
-                    <div
-                      style={{
-                        background: chain.iconBackground,
-                        width: 16,
-                        height: 16,
-                        borderRadius: 999,
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        alt={chain.name ?? 'Chain icon'}
-                        src={chain.iconUrl}
-                        style={{ width: 16, height: 16 }}
-                      />
-                    </div>
-                  ) : (
-                    <ChevronDown className="h-[1.2rem] w-[1.2rem]" />
-                  )}
-                  <span className="sr-only">Switch chain</span>
+                  <Droplets className="h-[1.2rem] w-[1.2rem]" />
+                  <span className="sr-only">Open faucet</span>
                 </Button>
 
                 {/* Balance Display - takes remaining space */}
                 {account.displayBalance && (
-                  <div className="flex-1 flex items-center justify-between px-3 py-2 bg-muted border border-input rounded-md h-10 min-w-0">
+                  <Button
+                    onClick={() => setIsBalanceModalOpen(true)}
+                    variant="outline"
+                    className="flex-1 flex items-center justify-between px-3 py-2 bg-muted border border-input rounded-md h-10 min-w-0 hover:bg-muted/80"
+                  >
                     <Wallet className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                     <span className="text-sm font-medium">
                       {(() => {
@@ -76,7 +70,7 @@ export function MobileWalletInfo() {
                         return balance;
                       })()}
                     </span>
-                  </div>
+                  </Button>
                 )}
               </div>
             ) : (
@@ -88,6 +82,19 @@ export function MobileWalletInfo() {
           </div>
         )
       }}
-    </ConnectButton.Custom>
+      </ConnectButton.Custom>
+
+      {/* Faucet Modal */}
+      <FaucetModal
+        open={isFaucetModalOpen}
+        onOpenChange={setIsFaucetModalOpen}
+      />
+
+      {/* Balance Modal */}
+      <BalanceModal
+        open={isBalanceModalOpen}
+        onOpenChange={setIsBalanceModalOpen}
+      />
+    </>
   )
 }

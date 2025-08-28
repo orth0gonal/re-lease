@@ -1,10 +1,14 @@
 'use client'
 
+import { useState } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { Button } from '@/components/ui/button'
+import { BalanceModal } from '@/components/modals/BalanceModal'
 import { Wallet, ChevronDown } from 'lucide-react'
 
 export function WalletConnectButton() {
+  const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false)
+
   return (
     <ConnectButton.Custom>
       {({
@@ -63,41 +67,15 @@ export function WalletConnectButton() {
               }
 
               return (
-                <div className="flex items-center gap-4">
-                  <div className="flex gap-4">
-                    {/* Chain button - hidden on mobile (same breakpoint as menu) */}
-                    <Button
-                      onClick={openChainModal}
-                      variant="outline"
-                      size="icon"
-                      className="hidden md:flex"
-                    >
-                      {chain.hasIcon && chain.iconUrl ? (
-                        <div
-                          style={{
-                            background: chain.iconBackground,
-                            width: 16,
-                            height: 16,
-                            borderRadius: 999,
-                            overflow: 'hidden',
-                          }}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            alt={chain.name ?? 'Chain icon'}
-                            src={chain.iconUrl}
-                            style={{ width: 16, height: 16 }}
-                          />
-                        </div>
-                      ) : (
-                        <ChevronDown className="h-[1.2rem] w-[1.2rem]" />
-                      )}
-                      <span className="sr-only">Switch chain</span>
-                    </Button>
-
-                    {/* Balance Display - positioned next to chain button */}
+                <>
+                  <div className="flex items-center gap-1.5">
+                    {/* Balance Display - desktop only */}
                     {account.displayBalance && (
-                      <div className="hidden md:flex items-center justify-between px-3 py-2 bg-muted border border-input rounded-md h-10 min-w-0">
+                      <Button
+                        onClick={() => setIsBalanceModalOpen(true)}
+                        variant="outline"
+                        className="hidden md:flex items-center justify-between px-3 py-2 bg-muted border border-input rounded-md h-10 min-w-0 hover:bg-muted/80"
+                      >
                         <Wallet className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                         <span className="text-sm font-medium ml-2">
                           {(() => {
@@ -112,7 +90,7 @@ export function WalletConnectButton() {
                             return balance;
                           })()}
                         </span>
-                      </div>
+                      </Button>
                     )}
 
                     {/* Account button - visible on mobile */}
@@ -128,7 +106,13 @@ export function WalletConnectButton() {
                       <ChevronDown className="w-3 h-3" />
                     </Button>
                   </div>
-                </div>
+
+                  {/* Balance Modal */}
+                  <BalanceModal
+                    open={isBalanceModalOpen}
+                    onOpenChange={setIsBalanceModalOpen}
+                  />
+                </>
               )
             })()}
           </div>

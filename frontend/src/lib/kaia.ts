@@ -46,12 +46,6 @@ export const kaiaTestnet = defineChain({
       url: 'https://kairos.kaiascan.io/',
     },
   },
-  contracts: {
-    multicall3: {
-      address: '0x40643b8aeaaca0b87ea1a1e596e64a0e14b1d244',
-      blockCreated: 87232478,
-    },
-  },
   testnet: true,
 })
 
