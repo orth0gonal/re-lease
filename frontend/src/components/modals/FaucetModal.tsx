@@ -49,7 +49,7 @@ export function FaucetModal({ open, onOpenChange }: FaucetModalProps) {
       openConnectModal()
     } catch (error) {
       console.error('Failed to open connect modal:', error)
-      toast.error('Failed to open wallet connection')
+      toast.error('Connection Failed', 'Failed to open wallet connection')
     }
     
     // Reset connecting state after a delay
@@ -86,9 +86,9 @@ export function FaucetModal({ open, onOpenChange }: FaucetModalProps) {
       const isUserRejection = message.toLowerCase().includes('denied')
       
       if (isUserRejection) {
-        toast.error('Transaction was rejected by user')
+        toast.error('Transaction Rejected', 'Transaction was rejected by user')
       } else {
-        toast.error('Failed to mint KRWC tokens')
+        toast.error('Mint Failed', 'Failed to mint KRWC tokens')
       }
     }
   }
@@ -96,7 +96,7 @@ export function FaucetModal({ open, onOpenChange }: FaucetModalProps) {
   // Handle successful transaction
   useEffect(() => {
     if (isSuccess && hash) {
-      toast.success('Successfully minted 1000 KRWC tokens!')
+      toast.success('Mint Successful', 'Successfully minted 1000 KRWC tokens!')
       
       // Close modal after showing toast
       setTimeout(() => {
@@ -116,9 +116,9 @@ export function FaucetModal({ open, onOpenChange }: FaucetModalProps) {
       const isUserRejection = message.toLowerCase().includes('denied')
       
       if (isUserRejection) {
-        toast.error('Transaction was rejected by user')
+        toast.error('Transaction Rejected', 'Transaction was rejected by user')
       } else {
-        toast.error('Transaction failed')
+        toast.error('Transaction Failed', 'Transaction failed')
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -126,7 +126,7 @@ export function FaucetModal({ open, onOpenChange }: FaucetModalProps) {
 
   useEffect(() => {
     if (receiptError) {
-      toast.error('Transaction confirmation failed')
+      toast.error('Confirmation Failed', 'Transaction confirmation failed')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receiptError])
@@ -136,7 +136,6 @@ export function FaucetModal({ open, onOpenChange }: FaucetModalProps) {
       open={open}
       onOpenChange={handleOpenChange}
       title="Faucet"
-      description="Get test tokens for the re:Lease platform"
       size="sm"
     >
       <div className="space-y-4">

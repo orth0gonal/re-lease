@@ -65,7 +65,6 @@ export function BalanceModal({ open, onOpenChange }: BalanceModalProps) {
       open={open}
       onOpenChange={onOpenChange}
       title="Token Balances"
-      description="View your current token balances"
       size="sm"
     >
       <div className="space-y-4">
