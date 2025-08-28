@@ -217,21 +217,25 @@ export function CreateContractModal({ open, onOpenChange }: CreateContractModalP
       })
       
       // Handle different types of errors - check multiple conditions
+      const message = typeof errorObj?.message === 'string' ? errorObj.message : ''
+      const reason = typeof errorObj?.reason === 'string' ? errorObj.reason : ''
+      const causeCode = typeof errorObj?.cause === 'object' && errorObj.cause && 'code' in errorObj.cause ? errorObj.cause.code : null
+      
       const isUserRejection = 
         errorObj?.code === 4001 || 
         errorObj?.code === 'ACTION_REJECTED' ||
         errorObj?.name === 'UserRejectedRequestError' ||
-        errorObj?.message?.toLowerCase().includes('rejected') || 
-        errorObj?.message?.toLowerCase().includes('denied') ||
-        errorObj?.message?.toLowerCase().includes('cancelled') ||
-        errorObj?.message?.toLowerCase().includes('user rejected') ||
-        errorObj?.cause?.code === 4001 ||
-        errorObj?.reason?.includes('rejected')
+        message.toLowerCase().includes('rejected') || 
+        message.toLowerCase().includes('denied') ||
+        message.toLowerCase().includes('cancelled') ||
+        message.toLowerCase().includes('user rejected') ||
+        causeCode === 4001 ||
+        reason.includes('rejected')
       
       if (isUserRejection) {
         toast.error("Transaction Cancelled", "Transaction was cancelled by user.", 5000)
       } else {
-        const errorMessage = errorObj?.message || "Failed to create rental contract. Please try again."
+        const errorMessage = message || "Failed to create rental contract. Please try again."
         toast.error("Contract Creation Failed", truncateText(errorMessage), 5000)
       }
     }
@@ -246,7 +250,6 @@ export function CreateContractModal({ open, onOpenChange }: CreateContractModalP
   const isLoading = isPending || isConfirming
 
   // Handle successful transaction
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isSuccess && hash) {
       toast.success(
@@ -260,7 +263,8 @@ export function CreateContractModal({ open, onOpenChange }: CreateContractModalP
         onOpenChange(false)
       }, 1000)
     }
-  }, [isSuccess, hash, onOpenChange])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuccess, hash, onOpenChange]) // toast is stable from useCallback
 
 
   return (

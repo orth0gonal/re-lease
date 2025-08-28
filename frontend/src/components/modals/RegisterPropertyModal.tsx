@@ -132,7 +132,6 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
   const isLoading = isPending || isConfirming
 
   // Handle successful transaction
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isSuccess && hash) {
       // Clear any remaining timeout when transaction is confirmed
@@ -152,10 +151,10 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
         onOpenChange(false)
       }, 1000)
     }
-  }, [isSuccess, hash, onOpenChange, timeoutId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuccess, hash, onOpenChange, timeoutId]) // toast is stable from useCallback
 
   // Handle wagmi error state (for user rejection)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (error) {
       console.log('Wagmi error detected:', error)
@@ -185,7 +184,8 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
         toast.error("Registration Failed", truncateText(errorMessage), 5000)
       }
     }
-  }, [error, timeoutId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error, timeoutId]) // toast is stable from useCallback
 
   // Handle wallet connection completion or cancellation
   useEffect(() => {
