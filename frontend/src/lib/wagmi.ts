@@ -1,5 +1,6 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
-import { kaiaMainnet, kaiaTestnet } from './kaia'
+import { kaiaTestnet } from './kaia'
+// import { kaiaMainnet } from './kaia' // Temporarily disabled
 
 export const wagmiConfig = getDefaultConfig({
   appName: 're:Lease',

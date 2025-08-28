@@ -246,6 +246,7 @@ export function CreateContractModal({ open, onOpenChange }: CreateContractModalP
   const isLoading = isPending || isConfirming
 
   // Handle successful transaction
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isSuccess && hash) {
       toast.success(

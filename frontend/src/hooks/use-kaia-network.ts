@@ -1,7 +1,8 @@
 'use client'
 
 import { useAccount, useChainId, useSwitchChain } from 'wagmi'
-import { kaiaMainnet, kaiaTestnet } from '@/lib/kaia'
+import { kaiaTestnet } from '@/lib/kaia'
+// import { kaiaMainnet } from '@/lib/kaia' // Temporarily disabled
 
 export function useKaiaNetwork() {
   const { isConnected } = useAccount()

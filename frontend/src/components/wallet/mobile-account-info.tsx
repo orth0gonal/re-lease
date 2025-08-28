@@ -21,7 +21,7 @@ export function MobileAccountInfo() {
         account,
         chain,
         openChainModal,
-        openConnectModal,
+        // openConnectModal,
         authenticationStatus,
         mounted,
       }) => {

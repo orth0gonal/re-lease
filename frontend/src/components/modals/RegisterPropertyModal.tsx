@@ -123,6 +123,7 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
   const isLoading = isPending || isConfirming
 
   // Handle successful transaction
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isSuccess && hash) {
       // Clear any remaining timeout when transaction is confirmed
@@ -145,6 +146,7 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
   }, [isSuccess, hash, onOpenChange, timeoutId])
 
   // Handle wagmi error state (for user rejection)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (error) {
       console.log('Wagmi error detected:', error)
