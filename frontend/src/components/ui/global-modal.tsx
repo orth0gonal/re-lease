@@ -29,13 +29,15 @@ export function GlobalModal({
 }: GlobalModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`${sizeClasses[size]} ${className}`}>
-        <DialogHeader>
+      <DialogContent className={`${sizeClasses[size]} ${className} flex flex-col`}>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-lg font-semibold">
             {title}
           </DialogTitle>
         </DialogHeader>
-        {children}
+        <div className="flex-1 overflow-y-auto min-h-0 p-2">
+          {children}
+        </div>
       </DialogContent>
     </Dialog>
   )
