@@ -165,22 +165,16 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
         setTimeoutId(null)
       }
       
-      // Handle different types of errors - check multiple conditions
-      const isUserRejection = 
-        error?.code === 4001 || 
-        error?.code === 'ACTION_REJECTED' ||
-        error?.name === 'UserRejectedRequestError' ||
-        error?.message?.toLowerCase().includes('rejected') || 
-        error?.message?.toLowerCase().includes('denied') ||
-        error?.message?.toLowerCase().includes('cancelled') ||
-        error?.message?.toLowerCase().includes('user rejected') ||
-        error?.message?.toLowerCase().includes('user denied') ||
-        error?.cause?.code === 4001
+      // Handle different types of errors - check for user rejection
+      const errorObj = error as any
+      const message = typeof errorObj?.message === 'string' ? errorObj.message : ''
+      
+      const isUserRejection = message.toLowerCase().includes('denied')
       
       if (isUserRejection) {
         toast.error("Transaction Cancelled", "Transaction was cancelled by user.", 5000)
       } else {
-        const errorMessage = error.message || "Failed to register property. Please try again."
+        const errorMessage = message || "Failed to register property. Please try again."
         toast.error("Registration Failed", truncateText(errorMessage), 5000)
       }
     }

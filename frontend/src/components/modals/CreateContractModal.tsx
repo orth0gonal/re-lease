@@ -216,21 +216,10 @@ export function CreateContractModal({ open, onOpenChange }: CreateContractModalP
         reason: errorObj?.reason
       })
       
-      // Handle different types of errors - check multiple conditions
+      // Handle different types of errors - check for user rejection
       const message = typeof errorObj?.message === 'string' ? errorObj.message : ''
-      const reason = typeof errorObj?.reason === 'string' ? errorObj.reason : ''
-      const causeCode = typeof errorObj?.cause === 'object' && errorObj.cause && 'code' in errorObj.cause ? errorObj.cause.code : null
       
-      const isUserRejection = 
-        errorObj?.code === 4001 || 
-        errorObj?.code === 'ACTION_REJECTED' ||
-        errorObj?.name === 'UserRejectedRequestError' ||
-        message.toLowerCase().includes('rejected') || 
-        message.toLowerCase().includes('denied') ||
-        message.toLowerCase().includes('cancelled') ||
-        message.toLowerCase().includes('user rejected') ||
-        causeCode === 4001 ||
-        reason.includes('rejected')
+      const isUserRejection = message.toLowerCase().includes('denied')
       
       if (isUserRejection) {
         toast.error("Transaction Cancelled", "Transaction was cancelled by user.", 5000)
