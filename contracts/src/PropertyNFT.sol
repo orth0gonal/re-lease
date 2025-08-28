@@ -27,7 +27,9 @@ contract PropertyNFT is ERC721Enumerable, AccessControl, Pausable, ReentrancyGua
     
     // Constants
     uint256 public constant VERIFICATION_PERIOD = 14 days;
-    uint256 public constant GRACE_PERIOD = 1 days;
+    // uint256 public constant GRACE_PERIOD = 1 days;
+    uint256 public constant GRACE_PERIOD = 1 seconds; // for prototyping
+
 
     /**
      * @dev Constructor initializes the contract

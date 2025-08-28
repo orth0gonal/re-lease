@@ -1,12 +1,12 @@
 {
   "network": "kaia_testnet",
   "chainId": 1001,
-  "deployedAt": "1756308773",
+  "deployedAt": "1756338294",
   "deployer": "0x541070bECf02bdE10Fbd347bb7EedC8033609A48",
   "contracts": {
-    "KRWToken": "0x7d514aB4EE81ed4b3759A1624245f34EBdb315fc",
-    "PropertyNFT": "0x2D97D074FEF385b9b3f44064A7dd1349Cb9fdBdF",
-    "DepositPool": "0xa0c0FBdAb220cDe50e9606B8Cf02D0119793D023"
+    "KRWToken": "0xd3E4A72238F9BcB75BfFF82B35c243605FabE6d9",
+    "PropertyNFT": "0xEA9C6002471aA57f1BaE0B6F6F2e49c0e1E83663",
+    "DepositPool": "0xb41fa057FA4890A12F0eA8a8Cf1C2F02e1E3B171"
   },
   "configuration": {
     "krwTokenSupply": "100000000000000000000000000",

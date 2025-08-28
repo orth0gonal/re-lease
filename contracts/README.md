@@ -6,9 +6,9 @@
 
 | Contract | Address | KaiaScan |
 |----------|---------|----------|
-| **KRWToken** | `0x7d514aB4EE81ed4b3759A1624245f34EBdb315fc` | [![KaiaScan](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://kairos.kaiascan.io/ko/address/0x7d514ab4ee81ed4b3759a1624245f34ebdb315fc?tabId=txList&page=1) |
-| **PropertyNFT** | `0x2D97D074FEF385b9b3f44064A7dd1349Cb9fdBdF` | [![KaiaScan](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://kairos.kaiascan.io/ko/address/0x2D97D074FEF385b9b3f44064A7dd1349Cb9fdBdF?tabId=txList&page=1) |
-| **DepositPool** | `0xa0c0FBdAb220cDe50e9606B8Cf02D0119793D023` | [![KaiaScan](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://kairos.kaiascan.io/ko/address/0xa0c0FBdAb220cDe50e9606B8Cf02D0119793D023?tabId=txList&page=1) |
+| **KRWToken** | `0xd3E4A72238F9BcB75BfFF82B35c243605FabE6d9` | [![KaiaScan](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://kairos.kaiascan.io/ko/address/0xd3E4A72238F9BcB75BfFF82B35c243605FabE6d9?tabId=txList&page=1) |
+| **PropertyNFT** | `0xEA9C6002471aA57f1BaE0B6F6F2e49c0e1E83663` | [![KaiaScan](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://kairos.kaiascan.io/ko/address/0xEA9C6002471aA57f1BaE0B6F6F2e49c0e1E83663?tabId=txList&page=1) |
+| **DepositPool** | `0xb41fa057FA4890A12F0eA8a8Cf1C2F02e1E3B171` | [![KaiaScan](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://kairos.kaiascan.io/ko/address/0xb41fa057FA4890A12F0eA8a8Cf1C2F02e1E3B171?tabId=txList&page=1) |
 
 **Network**: Kaia Testnet (Chain ID: 1001)  
 **Deployer**: `0x541070bECf02bdE10Fbd347bb7EedC8033609A48`
