@@ -13,196 +13,190 @@
 [![Hackathon](https://img.shields.io/badge/🏆_Kaia_Hackathon-DoraHacks-orange)](https://dorahacks.io/buidl/31903/)
 [![Documentation](https://img.shields.io/badge/📚_Documentation-View_Docs-informational)](docs/)
 
+### 🔗 Kaia Testnet Deployed Contracts
+
+| Contract | Address | KaiaScan |
+|----------|---------|----------|
+| **KRWToken** | `0xd3E4A72238F9BcB75BfFF82B35c243605FabE6d9` | [![KaiaScan](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://kairos.kaiascan.io/ko/address/0xd3E4A72238F9BcB75BfFF82B35c243605FabE6d9?tabId=txList&page=1) |
+| **PropertyNFT** | `0xEA9C6002471aA57f1BaE0B6F6F2e49c0e1E83663` | [![KaiaScan](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://kairos.kaiascan.io/ko/address/0xEA9C6002471aA57f1BaE0B6F6F2e49c0e1E83663?tabId=txList&page=1) |
+| **DepositPool** | `0xb41fa057FA4890A12F0eA8a8Cf1C2F02e1E3B171` | [![KaiaScan](https://img.shields.io/badge/Kaia-Network-green?logo=ethereum&logoColor=white)](https://kairos.kaiascan.io/ko/address/0xb41fa057FA4890A12F0eA8a8Cf1C2F02e1E3B171?tabId=txList&page=1) |
+
+**Network**: Kaia Testnet (Chain ID: 1001)  
 </div>
 
-> **블록체인 기술로 한국 전세 계약을 혁신하다**
+## About re:Lease Platform
 
-한국 전세 보증금 보호를 위한 포괄적인 블록체인 솔루션으로, Kaia 블록체인과 KRWC 스테이블코인 통합, 자동화된 P2P 채권 거래를 제공합니다.
+re:Lease is a blockchain-based Jeonse (전세) deposit protection platform that fundamentally solves the Korean Jeonse fraud problem through automated debt-credit relationship establishment and tokenization.
 
-## Platform Overview
+### Platform Name Meaning
 
-**re:Lease**는 전통적인 임대차 계약을 투명하고 자동화된 블록체인 계약으로 변환하여 한국의 전세 사기 문제를 근본적으로 해결합니다. 플랫폼은 스마트 계약을 통해 채권-채무 관계를 확립하고 보증금 토큰화를 통한 수익 창출을 가능하게 합니다.
+re:Lease: Combines 'Re (Again, New)' and 'Lease', meaning redefining the rental system
+Double meaning of 'Release': Unlocking landlords' tied assets and releasing tenants' anxiety
 
-### 시장 현황
+### Core Problem Solved
 
-한국 전세 사기가 위기 수준에 도달했습니다:
-- **4.5조원**의 보증보험 사고 (2024년, 2021년 대비 7배 증가)
-- **30,400명 이상**의 확인된 사기 피해자 (2025년 5월 기준)
-- 중개업소, 가짜 임대인, 신탁회사가 연루된 조직적 사기 스킴
+Korean Jeonse fraud has become a serious social issue with:
+- 4.5 trillion KRW in guarantee insurance accidents in 2024 (7x increase from 2021)
+- Over 30,400 confirmed fraud victims as of May 2025
+- Organized fraud schemes involving brokers, fake landlords, and trust companies
 
-### 핵심 솔루션
+### Solution Architecture
 
-re:Lease는 다음을 통해 이러한 문제들을 해결합니다:
-1. **KRWC 스테이블코인 통합** - 모든 거래에 원화 스테이블코인 사용
-2. **스마트 계약 자동화** - 자동화된 실행 및 조건 처리
-3. **보증금 토큰화** - 임대인을 위한 yKRWC 수익 창출 토큰
-4. **P2P 채권 거래** - 채권양수인 시스템을 통한 분산형 리스크 관리
-5. **투명한 추적** - 모든 거래의 실시간 온체인 가시성
+1. KRW Stablecoin Integration
+- Primary Currency: Uses KRWC (Korean Won stablecoin) for all Jeonse deposits
+- Smart Contract Automation: All transactions and conditions automated through blockchain
+- Transparency: Real-time tracking of fund flows and contract states on-chain
 
-## System Architecture
+2. Deposit Tokenization System
+- yKRWC Token: ERC-4626 based yield-bearing token that increases in value over time
+- Deposit Pool: Central vault where all KRWC deposits are pooled and managed
+- Asset Management: Pool funds invested in safe assets (government bonds, AAA-grade bonds, stablecoin protocols) generating 3-5% annual returns
+- Revenue Distribution: 70% to yKRWC holders, 20% platform fees, 10% risk buffer
 
-### 핵심 스마트 계약
+3. Guaranteed Return Mechanism
+- Automatic Conversion: If landlord fails to return deposit, contract automatically converts to debt-credit relationship
+- Assignee System: Assignees can purchase the debt, immediately returning deposit to tenant
+- Legal Integration: Smart contracts integrated with legal proceedings for property foreclosure if needed
 
-#### PropertyNFT Contract (ERC-721)
-- **부동산 관리**: 부동산 토큰화 및 검증
-- **계약 생명주기**: 전세 계약의 전체 생명주기 관리
-- **상태 추적**: PENDING → REGISTERED → SUSPENDED 상태
-- **채권 리스팅**: P2P 마켓플레이스 자동 활성화
+### Key Stakeholders
 
-#### DepositPool Contract (ERC-4626)
-- **볼트 시스템**: KRWC ↔ yKRWC 변환 및 관리
-- **수익 생성**: 풀 투자를 통한 자동 수익 창출 (연 3-5%)
-- **보증금 처리**: 안전한 제출, 반환 및 회수 프로세스
-- **채권 관리**: 구매, 상환 및 이자 계산
+1. Tenant (임차인)
+- Benefits: Guaranteed deposit safety, transparent fund tracking, legal interest protection
+- Process: Deposits KRWC → Receives protection through smart contract and assignee system
 
-### 주요 참여자
+2. Landlord (임대인)
+- Benefits: Immediate liquidity through yKRWC trading, yield earnings from holding, potential tax benefits
+- Options:
+- - Option 1: Sell yKRWC for immediate cash
+- - Option 2: Hold yKRWC to earn yield while maintaining principal
 
-- **임차인**: KRWC 예치, 보증금 보호 수령
-- **임대인**: yKRWC 토큰 수령, 유동성 또는 수익 선택 가능
-- **채권양수인**: 부동산 담보가 있는 디폴트 채권 구매
-- **검증자**: 부동산 검증 및 계약 승인 권한
+3. Assignee (채권양수인)
+- Benefits: Stable investment with real estate collateral, higher returns than traditional insurance
+- Protection: Priority in debt recovery under Korean Housing Lease Protection Act
 
-## Process Flows
+4. Verifier (운영사)
+- Role: Deposit pool management, property verification, smart contract operations
+- Revenue: Pool management fees, transaction fees, premium services
 
-### 1. 부동산 등록 및 검증
+### Process Flow
+
+#### 1. Contract Initiation
+
+1. Tenant deposits KRWC into smart contract
+2. Smart contract deposits KRWC into deposit pool
+3. Pool issues yKRWC tokens to landlord
+4. Landlord chooses to hold (earn yield) or sell (get liquidity)
+
+#### 2. During Contract Period
+
+1. yKRWC value increases automatically through pool yield generation
+2. All parties can track contract status on blockchain
+3. No intermediary involvement required
+
+#### 3. Contract Maturity
+
+1. Within 1-day grace period:
+- If landlord has yKRWC: Converts to KRWC, returns deposit to tenant, keeps yield
+- If landlord sold yKRWC: Must deposit KRWC directly to return to tenant
+
+2. After grace period (Default):
+- Automatic debt-credit relationship establishment
+- Assignee can purchase debt, immediately protecting tenant
+- Landlord owes principal + 5% annual interest to assignee
+
+#### 4. Debt Recovery
+- Assignee earns interest from landlord
+- If long-term default: Legal proceedings for property foreclosure
+- Smart contract integrates with legal resolution for final settlement
+
+## Project Structure
+
+This is a monorepo containing a React frontend and Foundry-based smart contracts:
+
+- `frontend/` - Next.js 15 frontend application with React 19
+- `contracts/` - Solidity smart contracts using Foundry framework
+
+## Development Commands
+
+### Frontend (Next.js App)
+Navigate to `frontend/` directory for all frontend commands:
+
+```bash
+cd frontend
+npm install          # Install dependencies
+npm run dev         # Run development server with Turbopack (localhost:3000)
+npm run build       # Build for production
+npm start           # Start production server
+npm run lint        # Run ESLint
 ```
-임대인 부동산 등록 → 14일 검증 기간 → 검증자 승인 → NFT 발행
+
+### Smart Contracts (Foundry)
+Navigate to `contracts/` directory for all contract commands:
+
+```bash
+cd contracts
+forge build         # Compile contracts
+forge test          # Run all tests
+forge test --match-test <test_name>  # Run specific test
+forge fmt           # Format Solidity code
+forge snapshot      # Generate gas usage snapshots
+anvil               # Start local Ethereum node
 ```
 
-### 2. 계약 생성 및 활성화
-```
-임대인 계약 생성 → 임차인 KRWC 예치 → yKRWC 자동 변환 → 계약 활성화
-```
+## Architecture Overview
 
-### 3. 정산 프로세스
+### Frontend Architecture
+- **Next.js 15** with React 19 and TypeScript
+- **Web3 Integration**: RainbowKit + Wagmi for wallet connectivity
+- **UI Components**: Shadcn UI primitives with Tailwind CSS
+- **Styling**: Tailwind CSS with CSS custom properties and dark mode
+- **Blockchain**: Kaia network integration with balance tracking
 
-#### 정상 정산 (유예 기간)
-```
-계약 만료 → 1일 유예 기간 → 임대인 보증금 반환 → 임차인 자금 회수
-```
+### Smart Contract Architecture
+- Foundry-based Solidity development environment
+- Standard contract structure in `contracts/src/`
+- Test contracts in `contracts/test/`
+- Deployment scripts in `contracts/script/`
+- Uses forge-std library for testing utilities
 
-#### 디폴트 및 P2P 거래
-```
-유예 기간 만료 → P2P 거래 자동 리스팅 → 채권양수인 채권 구매 → 이자 누적 → 상환 추적
-```
+### Integration Points
+This is a Web3 application where:
+- **Frontend-Blockchain**: Wagmi + Viem for Ethereum/Kaia network interactions
+- **Wallet Integration**: RainbowKit provides multi-wallet connectivity
+- **Smart Contract Interaction**: Type-safe contract interactions with Wagmi
+- **Network Support**: Configured for Kaia blockchain network
+- **Deployment**: Frontend deploys to Vercel, contracts to Ethereum-compatible networks
 
-## Tech Stack
+## Development Workflow
 
-### 프론트엔드 애플리케이션
-- **Next.js 15** (React 19 및 TypeScript 포함)
-- **Tailwind CSS** + **Shadcn UI** (모던하고 접근성 있는 디자인)
-- **Wagmi v2** + **Viem** (블록체인 상호작용)
-- **RainbowKit** (멀티 지갑 연결)
-- **Kaia Network** 통합 (메인넷: 8217, 테스트넷: 1001)
+1. **Frontend Development**: Work in `frontend/` directory using Next.js App Router patterns
+2. **Contract Development**: Work in `contracts/` directory using Foundry workflows  
+3. **Web3 Integration**: Use Wagmi hooks and RainbowKit components for blockchain interactions
+4. **Styling**: Use Tailwind CSS classes with custom CSS properties for theming
+5. **Local Development**: Use `npm run dev` for frontend with Turbopack, `anvil` for local blockchain
 
-### 스마트 계약
-- **Foundry** 개발 프레임워크
-- **Solidity 0.8.20** (OpenZeppelin 표준)
-- **ERC-721** (부동산 NFT)
-- **ERC-4626** (볼트 토큰 시스템)
-- **역할 기반 접근 제어** (RBAC) 보안
+## Key Innovations
 
-### 블록체인 인프라
-- **Kaia 블록체인** (EVM 호환, 높은 TPS, 낮은 수수료)
-- **KRWC 스테이블코인** (KRW 페깅 안정성)
-- **yKRWC 볼트 토큰** (ERC-4626 수익 창출형)
+### 1. Fraud Prevention Mechanisms
 
-## Security & Compliance
+- 깡통전세 (Underwater Jeonse): Pre-verification of property value and LTV limits
+- Fake Landlords: On-chain verification with government registry
+- Trust Company Fraud: Automatic trust authority verification
+- Double Contracts: Blockchain prevents duplicate contracts on same property
+- Loan Execution Fraud: Financial authority integration for loan detection
 
-### 스마트 계약 보안
-- **ReentrancyGuard** - 재진입 공격 방지
-- **Pausable** - 긴급 정지 기능
-- **SafeERC20** - 안전한 토큰 전송 메커니즘
-- **입력 검증** - 포괄적인 매개변수 검증
-- **역할 기반 접근** - 세밀한 권한 관리
+### 2. Economic Sustainability
 
-### 규제 컴플라이언스
-- **KYC/AML** 통합 준비
-- **정부 등기소** 검증
-- **금융당국** 대출 탐지 협조
-- **법적 프레임워크** 부동산 경매 통합
+- Revenue Sources: Pool management fees (1% annual), transaction fees (0.5%), premium services
+- Market Size: Targeting 0.1% of 400 trillion KRW Korean Jeonse market
+- Expansion: Extensible to monthly rent, commercial real estate, international markets
 
-### 리스크 관리
-- **LTV 한도** - 부동산 가치 검증 및 한도 설정
-- **사기 방지** - 다중 검증 레이어
-- **보험 통합** - 보증금 보호 메커니즘
-- **실시간 모니터링** - 의심 활동 탐지
+### 3. Technical Advantages
 
-
-## Key Features & Innovations
-
-### 사기 방지 메커니즘
-- **깡통전세 방지**: 부동산 가치 사전 검증 및 LTV 한도 설정
-- **가짜 임대인 탐지**: 정부 등기소와의 온체인 검증
-- **신탁회사 검증**: 자동 신탁 권한 검증
-- **이중 계약 방지**: 블록체인이 중복 계약 방지
-- **대출 사기 탐지**: 금융당국 통합
-
-### 경제 모델
-- **자동 수익**: 예치 자금의 연 3-5% 수익
-- **유동성 옵션**: 임대인은 yKRWC 판매 또는 수익을 위한 보유 선택
-- **리스크 분산**: P2P 채권 거래를 통한 디폴트 리스크 분산
-- **투명한 가격책정**: 모든 수수료와 요율이 온체인에서 공개
-- **확장 가능한 수익**: 지속가능성을 위한 다중 수익 스트림
-
-### 기술적 장점
-- **고성능**: 대중 채택을 위한 Kaia의 4,000+ TPS
-- **저비용**: 1페니 이하의 거래 수수료
-- **EVM 호환성**: 표준 이더리움 도구 및 라이브러리
-- **모바일 최적화**: 모바일 우선 채택을 위한 반응형 디자인
-- **조합성**: 다른 DeFi 프로토콜과의 통합
-
-## Documentation & Resources
-
-### 기술 문서
-- [스마트 계약 문서](contracts/docs.md) - 완전한 계약 사양
-- [아키텍처 가이드](contracts/architecture.md) - 시스템 설계 및 플로우
-- [프론트엔드 가이드](frontend/README-RELEASE.md) - UI/UX 개발
-
-### 외부 리소스
-- [Kaia Documentation](https://docs.kaia.io/)
-- [Foundry Book](https://book.getfoundry.sh/)
-- [Wagmi Documentation](https://wagmi.sh/)
-- [Next.js Documentation](https://nextjs.org/docs)
-
-## License & Legal
-
-### 오픈 소스 라이선스
-이 프로젝트는 **GPL-3.0**에 따라 라이선스가 부여됩니다 - 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
-
-### 법적 컴플라이언스
-- **한국 금융법** 준수
-- **데이터 보호** 규정 준수
-- **스마트 계약** 법적 프레임워크 통합
-- **국제적** 확장 고려사항
-
-### 면책 조항
-이 플랫폼은 교육 및 시연 목적입니다. 사용자는 프로덕션 환경에서 사용하기 전에 적절한 법적 및 재정적 실사를 수행해야 합니다.
-
----
-
-## Roadmap & Future Vision
-
-### Phase 1: MVP 출시 (2025년 3분기)
-- 핵심 스마트 계약 배포
-- 지갑 통합을 포함한 프론트엔드 애플리케이션
-- 기본 부동산 등록 및 검증
-- 보증금 관리 및 회수
-
-### Phase 2: P2P 거래 (2025년 4분기)
-- 채권 마켓플레이스 구현
-- 고급 수익 농업 기능
-- 모바일 앱 개발
-- 정부 파트너십 통합
-
-### Phase 3: 확장 및 성장 (2026년 1-2분기)
-- 월세 계약 지원
-- 상업용 부동산 통합
-- 국경 간 송금 기능
-- 보험 및 법률 자동화
-
-
----
+- Automatic Execution: Smart contracts eliminate manual intervention
+- Transparency: All transactions visible on blockchain
+- Composability: Integration with other DeFi protocols
+- Scalability: KAIA's high TPS supports mass adoption
 
 <div align="center">
 
