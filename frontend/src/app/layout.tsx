@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { Web3Provider } from "@/providers/web3-provider";
+import { ToastProvider } from "@/components/ui/toast-provider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -34,7 +35,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <Web3Provider>
-            {children}
+            <ToastProvider>
+              {children}
+            </ToastProvider>
           </Web3Provider>
         </ThemeProvider>
         <div id="modal-root" />

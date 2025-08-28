@@ -8,12 +8,14 @@ export function useKaiaNetwork() {
   const chainId = useChainId()
   const { switchChain, isPending } = useSwitchChain()
 
-  const isKaiaNetwork = chainId === kaiaMainnet.id || chainId === kaiaTestnet.id
-  const isMainnet = chainId === kaiaMainnet.id
+  // Currently only supporting Kairos testnet
+  const isKaiaNetwork = chainId === kaiaTestnet.id
+  const isMainnet = false // Mainnet support disabled temporarily
   const isTestnet = chainId === kaiaTestnet.id
 
   const switchToKaiaMainnet = () => {
-    switchChain({ chainId: kaiaMainnet.id })
+    // Mainnet support temporarily disabled
+    console.warn('Mainnet support is temporarily disabled')
   }
 
   const switchToKaiaTestnet = () => {
@@ -21,9 +23,9 @@ export function useKaiaNetwork() {
   }
 
   const getCurrentNetwork = () => {
-    if (chainId === kaiaMainnet.id) return kaiaMainnet
+    // Currently only supporting Kairos testnet
     if (chainId === kaiaTestnet.id) return kaiaTestnet
-    return null
+    return null // Mainnet and other networks not supported currently
   }
 
   return {

@@ -55,4 +55,6 @@ export const kaiaTestnet = defineChain({
   testnet: true,
 })
 
-export const supportedChains = [kaiaMainnet, kaiaTestnet] as const
+// Currently only supporting Kairos testnet, mainnet will be added later
+export const supportedChains = [kaiaTestnet] as const
+export const allChains = [kaiaMainnet, kaiaTestnet] as const // For future use

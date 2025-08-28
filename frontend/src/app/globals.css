@@ -59,15 +59,20 @@
   }
 }
 
-/* RainbowKit Protection - Minimal necessary fixes only */
+/* RainbowKit z-index fix */
 @layer utilities {
-  /* Only essential z-index fix */
+  /* Ensure RainbowKit modal appears above all other modals */
   [data-rk] {
     z-index: 9999 !important;
   }
   
-  /* Prevent body scroll when modal is open */
-  body:has([data-rk] [role="dialog"]) {
-    overflow: hidden !important;
+  /* When RainbowKit modal is open, disable pointer events on other modal overlays */
+  body:has([data-rk] [role="dialog"]) [data-radix-dialog-overlay] {
+    pointer-events: none !important;
+  }
+  
+  /* Keep RainbowKit modal fully interactive */
+  [data-rk] * {
+    pointer-events: auto !important;
   }
 }

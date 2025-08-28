@@ -1,12 +1,17 @@
 'use client'
 
+import { useState } from 'react'
 import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { RegisterPropertyModal } from '@/components/modals/RegisterPropertyModal'
+import { CreateContractModal } from '@/components/modals/CreateContractModal'
 import { Home, Coins, TrendingUp, Banknote, Clock, Building, FileText, AlertTriangle, AlertCircle, Minus, PlusCircle } from 'lucide-react'
 
 export default function LandlordPage() {
+  const [registerModalOpen, setRegisterModalOpen] = useState(false)
+  const [createContractModalOpen, setCreateContractModalOpen] = useState(false)
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted flex flex-col">
       <Navbar />
@@ -156,9 +161,9 @@ export default function LandlordPage() {
               <Building className="w-5 h-5 text-primary" />
               <h2 className="text-lg font-semibold">My Properties (0)</h2>
             </div>
-            <Button>
-              <PlusCircle className="w-4 h-4 mr-2" />
-              Register Property
+            <Button onClick={() => setRegisterModalOpen(true)} className="px-4">
+              <PlusCircle className="w-4 h-4 mr-1" />
+              Register
             </Button>
           </div>
 
@@ -184,9 +189,9 @@ export default function LandlordPage() {
               <FileText className="w-5 h-5 text-primary" />
               <h2 className="text-lg font-semibold">My Contracts (0)</h2>
             </div>
-            <Button>
-              <FileText className="w-4 h-4 mr-2" />
-              Create Contract
+            <Button className="px-4" onClick={() => setCreateContractModalOpen(true)}>
+              <FileText className="w-4 h-4 mr-1" />
+              Create
             </Button>
           </div>
 
@@ -330,6 +335,16 @@ export default function LandlordPage() {
       </main>
 
       <Footer />
+      
+      <RegisterPropertyModal 
+        open={registerModalOpen} 
+        onOpenChange={setRegisterModalOpen} 
+      />
+      
+      <CreateContractModal 
+        open={createContractModalOpen} 
+        onOpenChange={setCreateContractModalOpen} 
+      />
     </div>
   )
 }
