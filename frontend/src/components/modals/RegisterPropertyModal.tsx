@@ -34,6 +34,7 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
     ltv: ''
   })
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null)
+  const [isConnecting, setIsConnecting] = useState(false)
 
   const { 
     writeContract, 
@@ -48,8 +49,13 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
+      // Don't close modal if wallet connection is in progress
+      if (isConnecting) {
+        return
+      }
       // Reset form when closing
       setFormData({ registrationAddress: '', ltv: '' })
+      setIsConnecting(false) // Reset connecting state
     }
     onOpenChange(newOpen)
   }
@@ -115,7 +121,10 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
     }
   }
 
-  const handleConnectWallet = () => {
+  const handleConnectWallet = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsConnecting(true)
     openConnectModal?.()
   }
 
@@ -177,6 +186,23 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
       }
     }
   }, [error, timeoutId])
+
+  // Handle wallet connection completion or cancellation
+  useEffect(() => {
+    if (isConnecting) {
+      if (isConnected && address) {
+        // Wallet connected successfully
+        setIsConnecting(false)
+      }
+      
+      // Reset connecting state after a timeout (in case user cancels)
+      const connectionTimeout = setTimeout(() => {
+        setIsConnecting(false)
+      }, 10000) // 10 second timeout
+      
+      return () => clearTimeout(connectionTimeout)
+    }
+  }, [isConnecting, isConnected, address])
 
   // Cleanup timeout on component unmount
   useEffect(() => {
