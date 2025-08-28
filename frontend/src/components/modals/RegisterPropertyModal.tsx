@@ -166,7 +166,7 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
       }
       
       // Handle different types of errors - check for user rejection
-      const errorObj = error as any
+      const errorObj = error as Record<string, unknown>
       const message = typeof errorObj?.message === 'string' ? errorObj.message : ''
       
       const isUserRejection = message.toLowerCase().includes('denied')
