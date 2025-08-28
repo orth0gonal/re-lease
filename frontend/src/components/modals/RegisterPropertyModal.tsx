@@ -100,7 +100,7 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
         // The actual result comes later through the hash from useWaitForTransactionReceipt
         console.log('WriteContract returned:', result)
         
-      } catch (writeError: any) {
+      } catch (writeError: unknown) {
         console.log('WriteContract threw an error:', writeError)
         
         // Clear timeout on writeContract error
@@ -108,7 +108,7 @@ export function RegisterPropertyModal({ open, onOpenChange }: RegisterPropertyMo
         setTimeoutId(null)
         throw writeError // Re-throw to be caught by outer catch
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log('Catch block executed with error:', error)
       // This catch block might not be needed since wagmi handles errors through the error state
       // Let the useEffect handle the error display

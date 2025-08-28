@@ -203,32 +203,35 @@ export function CreateContractModal({ open, onOpenChange }: CreateContractModalP
       clearTimeout(timeout)
       setIsLoadingTimeout(false)
       */
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating rental contract:', error)
+      
+      // Type guard for error object
+      const errorObj = error as any
       console.error('Error details:', { 
-        message: error?.message, 
-        code: error?.code, 
-        name: error?.name,
-        cause: error?.cause,
-        reason: error?.reason
+        message: errorObj?.message, 
+        code: errorObj?.code, 
+        name: errorObj?.name,
+        cause: errorObj?.cause,
+        reason: errorObj?.reason
       })
       
       // Handle different types of errors - check multiple conditions
       const isUserRejection = 
-        error?.code === 4001 || 
-        error?.code === 'ACTION_REJECTED' ||
-        error?.name === 'UserRejectedRequestError' ||
-        error?.message?.toLowerCase().includes('rejected') || 
-        error?.message?.toLowerCase().includes('denied') ||
-        error?.message?.toLowerCase().includes('cancelled') ||
-        error?.message?.toLowerCase().includes('user rejected') ||
-        error?.cause?.code === 4001 ||
-        error?.reason?.includes('rejected')
+        errorObj?.code === 4001 || 
+        errorObj?.code === 'ACTION_REJECTED' ||
+        errorObj?.name === 'UserRejectedRequestError' ||
+        errorObj?.message?.toLowerCase().includes('rejected') || 
+        errorObj?.message?.toLowerCase().includes('denied') ||
+        errorObj?.message?.toLowerCase().includes('cancelled') ||
+        errorObj?.message?.toLowerCase().includes('user rejected') ||
+        errorObj?.cause?.code === 4001 ||
+        errorObj?.reason?.includes('rejected')
       
       if (isUserRejection) {
         toast.error("Transaction Cancelled", "Transaction was cancelled by user.", 5000)
       } else {
-        const errorMessage = error.message || "Failed to create rental contract. Please try again."
+        const errorMessage = errorObj?.message || "Failed to create rental contract. Please try again."
         toast.error("Contract Creation Failed", truncateText(errorMessage), 5000)
       }
     }
