@@ -4,7 +4,7 @@ import { Navbar } from '@/components/ui/navbar'
 import { Footer } from '@/components/ui/footer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Shield, Coins, FileText, Plus, TrendingUp } from 'lucide-react'
+import { Shield, Coins, FileText, TrendingUp } from 'lucide-react'
 
 export default function TenantPage() {
   return (
@@ -24,141 +24,163 @@ export default function TenantPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-16">
-          <Card>
+        {/* Portfolio Overview Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold">Portfolio Overview</h2>
+          </div>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 mb-12">
+          <Card className="bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 border-green-200 dark:border-green-800">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Protected Deposits
+              <CardTitle className="text-sm font-medium text-green-700 dark:text-green-300">
+                Current Contracts
               </CardTitle>
-              <Shield className="h-4 w-4 text-muted-foreground" />
+              <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0 KRWC</div>
-              <p className="text-xs text-muted-foreground">
-                Total amount protected
+              <div className="text-2xl font-bold text-green-900 dark:text-green-100">0</div>
+              <p className="text-xs text-green-600 dark:text-green-400">
+                Active Jeonse contracts
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border-blue-200 dark:border-blue-800">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Active Contracts
+              <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                Total Deposits
               </CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
+              <Coins className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">
-                Current rental agreements
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Recovery Status
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">100%</div>
-              <p className="text-xs text-muted-foreground">
-                Guaranteed recovery rate
+              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">0 KRWC</div>
+              <p className="text-xs text-blue-600 dark:text-blue-400">
+                Total deposited amount
               </p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-2 mb-16">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="w-5 h-5" />
-                Create New Contract
+        {/* Risk Management Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Shield className="w-5 h-5 text-orange-500" />
+            <h2 className="text-lg font-semibold">Contract Status</h2>
+          </div>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
+          <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/30 dark:to-orange-900/20 border-orange-200 dark:border-orange-800">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-orange-700 dark:text-orange-300">
+                Expiring Soon
               </CardTitle>
-              <CardDescription>
-                Start a new Jeonse agreement with smart contract protection
-              </CardDescription>
+              <FileText className="h-4 w-4 text-orange-600 dark:text-orange-400" />
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Benefits:</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• KRWC stablecoin deposit protection</li>
-                  <li>• Automatic assignee recovery system</li>
-                  <li>• Smart contract transparency</li>
-                  <li>• Priority creditor status on default</li>
-                </ul>
-              </div>
-              <Button className="w-full" size="lg">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Contract
-              </Button>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">0</div>
+              <p className="text-xs text-orange-600 dark:text-orange-400">
+                Contracts expiring within 30 days
+              </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                My Contracts
+          <Card className="bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 border-red-200 dark:border-red-800">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-red-700 dark:text-red-300">
+                Converted to Debt
               </CardTitle>
-              <CardDescription>
-                View and manage your existing rental agreements
-              </CardDescription>
+              <Shield className="h-4 w-4 text-red-600 dark:text-red-400" />
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-center py-8 text-muted-foreground">
-                <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No contracts found</p>
-                <p className="text-sm">Create your first Jeonse contract to get started</p>
-              </div>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-900 dark:text-red-100">0</div>
+              <p className="text-xs text-red-600 dark:text-red-400">
+                Contracts converted to debt
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/20 border-purple-200 dark:border-purple-800">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                Recoverable Amount
+              </CardTitle>
+              <Coins className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">0 KRWC</div>
+              <p className="text-xs text-purple-600 dark:text-purple-400">
+                Principal + interest recoverable
+              </p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="mt-16">
-          <Card>
-            <CardHeader>
-              <CardTitle>How It Works</CardTitle>
-              <CardDescription>
-                Understanding your protection as a tenant
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="text-center space-y-2">
-                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
-                    <Coins className="w-6 h-6 text-primary" />
-                  </div>
-                  <h3 className="font-medium">1. Deposit KRWC</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Deposit your Jeonse amount in KRWC stablecoin into our smart contract
+        {/* Contract Management Section */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold">My Contracts (0)</h2>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {/* Empty State */}
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <h3 className="text-lg font-medium mb-2">No Contracts Yet</h3>
+                  <p className="text-muted-foreground">
+                    Your Jeonse contracts will appear here once created
                   </p>
                 </div>
-                <div className="text-center space-y-2">
-                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
-                    <Shield className="w-6 h-6 text-primary" />
-                  </div>
-                  <h3 className="font-medium">2. Get Protection</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Your deposit is protected by smart contracts and the assignee system
-                  </p>
-                </div>
-                <div className="text-center space-y-2">
-                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
-                    <TrendingUp className="w-6 h-6 text-primary" />
-                  </div>
-                  <h3 className="font-medium">3. Auto Recovery</h3>
-                  <p className="text-sm text-muted-foreground">
-                    If landlord defaults, assignees ensure immediate deposit recovery
-                  </p>
-                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* How It Works Guide Section */}
+        <div className="mt-16 bg-gradient-to-r from-primary/5 to-primary/10 rounded-2xl p-8 border border-primary/20">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold mb-2">How It Works</h2>
+            <p className="text-muted-foreground">
+              Understanding your protection as a tenant
+            </p>
+          </div>
+          
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="text-center space-y-3 group">
+              <div className="w-16 h-16 bg-white dark:bg-background rounded-2xl shadow-lg flex items-center justify-center mx-auto group-hover:scale-105 transition-transform">
+                <Coins className="w-8 h-8 text-primary" />
               </div>
-            </CardContent>
-          </Card>
+              <h3 className="font-semibold text-lg">1. Deposit KRWC</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Deposit your Jeonse amount in KRWC stablecoin into our smart contract
+              </p>
+            </div>
+            <div className="text-center space-y-3 group">
+              <div className="w-16 h-16 bg-white dark:bg-background rounded-2xl shadow-lg flex items-center justify-center mx-auto group-hover:scale-105 transition-transform">
+                <Shield className="w-8 h-8 text-primary" />
+              </div>
+              <h3 className="font-semibold text-lg">2. Get Protection</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Your deposit is protected by smart contracts and the assignee system
+              </p>
+            </div>
+            <div className="text-center space-y-3 group">
+              <div className="w-16 h-16 bg-white dark:bg-background rounded-2xl shadow-lg flex items-center justify-center mx-auto group-hover:scale-105 transition-transform">
+                <TrendingUp className="w-8 h-8 text-primary" />
+              </div>
+              <h3 className="font-semibold text-lg">3. Auto Recovery</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                If landlord defaults, assignees ensure immediate deposit recovery
+              </p>
+            </div>
+          </div>
         </div>
       </main>
 
