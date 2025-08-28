@@ -18,13 +18,8 @@ export function RainbowKitThemeProvider({ children }: RainbowKitThemeProviderPro
     setMounted(true)
   }, [])
 
-  // Use resolvedTheme for more accurate theme detection
-  // During SSR, assume light theme, but after mounting use actual theme
-  const isDark = mounted ? (resolvedTheme || theme) === 'dark' : 
-                 (typeof window !== 'undefined' && 
-                  (localStorage.getItem('theme') === 'dark' || 
-                   (localStorage.getItem('theme') === 'system' && 
-                    window.matchMedia('(prefers-color-scheme: dark)').matches)))
+  // Prevent hydration mismatch by always using false on server
+  const isDark = mounted ? (resolvedTheme || theme) === 'dark' : false
   
   const currentTheme = isDark ? darkTheme({
     accentColor: '#BFF009',
